@@ -4,6 +4,9 @@
 
 # --- Environment & Secrets ---
 .env
+.env.local
+.env.*.local
+*.env
 
 # --- Python ---
 __pycache__/
@@ -15,18 +18,25 @@ __pycache__/
 dist/
 build/
 .eggs/
+*.pyo
 
 # --- Virtual Environments ---
 venv/
 env/
 .venv/
 ENV/
+.conda/
+
+# --- Jupyter Notebooks ---
+.ipynb_checkpoints/
+*.ipynb
 
 # --- Testing & Coverage ---
 .pytest_cache/
 .coverage
 htmlcov/
 *.cover
+.tox/
 
 # --- IDE & Editor ---
 .vscode/
@@ -36,6 +46,7 @@ htmlcov/
 *~
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # --- Data (generated/user-uploaded, large files) ---
 data/copilot_app.db
@@ -50,11 +61,21 @@ data/processed_chunks/*.json
 
 # --- ML Models (binary, can be regenerated) ---
 models/scoring_model.joblib
+*.joblib
+*.pkl
+*.h5
+*.pt
+*.pth
+*.onnx
 
 # Keep directory structure with .gitkeep
 !models/.gitkeep
+
+# --- Node / Frontend (if applicable) ---
+node_modules/
 
 # --- Misc ---
 *.log
 *.tmp
 *.bak
+*.swp
