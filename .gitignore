@@ -1,0 +1,60 @@
+# ============================================================
+# Intelligent Academic & Career Copilot - .gitignore
+# ============================================================
+
+# --- Environment & Secrets ---
+.env
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# --- Virtual Environments ---
+venv/
+env/
+.venv/
+ENV/
+
+# --- Testing & Coverage ---
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# --- IDE & Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- Data (generated/user-uploaded, large files) ---
+data/copilot_app.db
+data/vector_store/chroma/
+data/raw_documents/*.pdf
+data/processed_chunks/*.json
+
+# Keep directory structure with .gitkeep
+!data/vector_store/.gitkeep
+!data/processed_chunks/.gitkeep
+!data/raw_documents/.gitkeep
+
+# --- ML Models (binary, can be regenerated) ---
+models/scoring_model.joblib
+
+# Keep directory structure with .gitkeep
+!models/.gitkeep
+
+# --- Misc ---
+*.log
+*.tmp
+*.bak

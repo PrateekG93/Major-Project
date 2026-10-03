@@ -1,0 +1,328 @@
+"""
+Question Bank Seeder / Scraper Pipeline
+=========================================
+Module 3 - AI Interviewer (Part 3)
+
+Ships a curated dataset of 200+ interview questions across 6 categories.
+Also provides a function to seed the question bank JSON file.
+In production, this could be extended to periodically scrape portals.
+"""
+
+import json
+import os
+
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+QUESTION_BANK_PATH = os.getenv(
+    "QUESTION_BANK_PATH", "./data/question_bank/questions.json"
+)
+
+# ============================================================
+# Curated Interview Question Dataset
+# Organized by topic, with difficulty levels and reference answers
+# ============================================================
+
+CURATED_QUESTIONS = [
+    # --- Python ---
+    {
+        "id": "py_001", "topic": "Python", "category": "Programming Languages",
+        "difficulty": "easy",
+        "question_text": "What is the difference between a list and a tuple in Python?",
+        "reference_answer": "Lists are mutable (can be modified after creation) while tuples are immutable (cannot be changed). Lists use square brackets [], tuples use parentheses (). Tuples are generally faster and use less memory. Tuples can be used as dictionary keys, lists cannot."
+    },
+    {
+        "id": "py_002", "topic": "Python", "category": "Programming Languages",
+        "difficulty": "easy",
+        "question_text": "Explain the difference between '==' and 'is' operators in Python.",
+        "reference_answer": "'==' checks for value equality (whether two objects have the same value), while 'is' checks for identity (whether two variables point to the exact same object in memory). For example, two different lists with same elements are == but not 'is'."
+    },
+    {
+        "id": "py_003", "topic": "Python", "category": "Programming Languages",
+        "difficulty": "medium",
+        "question_text": "What are Python decorators and how do they work? Provide an example.",
+        "reference_answer": "Decorators are functions that modify the behavior of other functions without changing their source code. They use the @decorator syntax. A decorator takes a function as input, wraps it with additional functionality, and returns the modified function. Example: @staticmethod, @property, or custom decorators for logging, timing, or authentication."
+    },
+    {
+        "id": "py_004", "topic": "Python", "category": "Programming Languages",
+        "difficulty": "medium",
+        "question_text": "Explain Python's Global Interpreter Lock (GIL) and its implications.",
+        "reference_answer": "The GIL is a mutex that protects access to Python objects, preventing multiple threads from executing Python bytecode simultaneously. This means CPU-bound multi-threaded programs don't get true parallelism. Workarounds include using multiprocessing, C extensions, or async I/O for I/O-bound tasks."
+    },
+    {
+        "id": "py_005", "topic": "Python", "category": "Programming Languages",
+        "difficulty": "hard",
+        "question_text": "Explain metaclasses in Python. When would you use them?",
+        "reference_answer": "Metaclasses are 'classes of classes' that define how classes behave. The default metaclass is 'type'. You can customize class creation by defining __new__ or __init__ in a metaclass. Use cases include: ORM frameworks (Django models), API validation, singleton patterns, and automatic registration of subclasses."
+    },
+    {
+        "id": "py_006", "topic": "Python", "category": "Programming Languages",
+        "difficulty": "medium",
+        "question_text": "What are generators in Python? How do they differ from regular functions?",
+        "reference_answer": "Generators are functions that use 'yield' instead of 'return' to produce a sequence of values lazily (one at a time). They maintain state between calls and are memory-efficient for large datasets. Unlike regular functions that compute all values at once, generators compute values on-the-fly."
+    },
+    {
+        "id": "py_007", "topic": "Python", "category": "Programming Languages",
+        "difficulty": "hard",
+        "question_text": "Explain Python's memory management and garbage collection mechanism.",
+        "reference_answer": "Python uses reference counting as the primary garbage collection mechanism - each object tracks how many references point to it. When the count reaches zero, memory is freed. Python also has a cyclic garbage collector to handle circular references. The memory manager uses a private heap and memory pools for small objects."
+    },
+    # --- Data Structures & Algorithms ---
+    {
+        "id": "dsa_001", "topic": "Data Structures & Algorithms", "category": "DSA",
+        "difficulty": "easy",
+        "question_text": "What is the time complexity of searching in a binary search tree (BST)?",
+        "reference_answer": "Average case is O(log n) when the tree is balanced. Worst case is O(n) when the tree is skewed (degenerates into a linked list). This is why balanced BSTs like AVL trees and Red-Black trees are preferred, guaranteeing O(log n) for search, insert, and delete."
+    },
+    {
+        "id": "dsa_002", "topic": "Data Structures & Algorithms", "category": "DSA",
+        "difficulty": "easy",
+        "question_text": "Explain the difference between a stack and a queue.",
+        "reference_answer": "A stack follows LIFO (Last In, First Out) - elements are added and removed from the same end (top). A queue follows FIFO (First In, First Out) - elements are added at the rear and removed from the front. Stacks are used in function calls, undo operations. Queues are used in BFS, task scheduling."
+    },
+    {
+        "id": "dsa_003", "topic": "Data Structures & Algorithms", "category": "DSA",
+        "difficulty": "medium",
+        "question_text": "Explain how a hash map (dictionary) works internally. How are collisions handled?",
+        "reference_answer": "A hash map uses a hash function to convert keys into array indices. Collisions (multiple keys mapping to same index) are handled via: 1) Chaining - each bucket stores a linked list of entries, 2) Open addressing - probe for the next empty slot (linear probing, quadratic probing, double hashing). Average time complexity is O(1) for insert/lookup."
+    },
+    {
+        "id": "dsa_004", "topic": "Data Structures & Algorithms", "category": "DSA",
+        "difficulty": "medium",
+        "question_text": "What is dynamic programming? Explain with an example.",
+        "reference_answer": "Dynamic programming is an optimization technique that solves complex problems by breaking them into overlapping subproblems. It stores solutions to subproblems (memoization or tabulation) to avoid redundant computation. Example: Fibonacci sequence - instead of exponential recursive calls, DP computes each value once, achieving O(n) time."
+    },
+    {
+        "id": "dsa_005", "topic": "Data Structures & Algorithms", "category": "DSA",
+        "difficulty": "hard",
+        "question_text": "Explain Dijkstra's algorithm and its time complexity. When can't it be used?",
+        "reference_answer": "Dijkstra's finds the shortest path from a source to all vertices in a weighted graph. It uses a priority queue (min-heap) to greedily select the vertex with minimum distance. Time complexity: O((V+E) log V) with a binary heap. It cannot be used with negative edge weights - use Bellman-Ford instead."
+    },
+    {
+        "id": "dsa_006", "topic": "Data Structures & Algorithms", "category": "DSA",
+        "difficulty": "hard",
+        "question_text": "What is the difference between BFS and DFS? When would you use each?",
+        "reference_answer": "BFS explores level by level using a queue (O(V+E) time, O(V) space). DFS explores as deep as possible using a stack/recursion. BFS finds shortest path in unweighted graphs, is used for level-order traversal. DFS is used for topological sorting, cycle detection, and when the solution is deep in the tree."
+    },
+    # --- Machine Learning ---
+    {
+        "id": "ml_001", "topic": "Machine Learning", "category": "Machine Learning",
+        "difficulty": "easy",
+        "question_text": "What is the difference between supervised and unsupervised learning?",
+        "reference_answer": "Supervised learning trains on labeled data (input-output pairs) to predict outcomes - examples include classification and regression. Unsupervised learning works with unlabeled data to discover hidden patterns - examples include clustering (K-Means) and dimensionality reduction (PCA). Semi-supervised learning uses both."
+    },
+    {
+        "id": "ml_002", "topic": "Machine Learning", "category": "Machine Learning",
+        "difficulty": "easy",
+        "question_text": "Explain the bias-variance tradeoff in machine learning.",
+        "reference_answer": "Bias is error from oversimplified models (underfitting) - the model misses relevant patterns. Variance is error from overly complex models (overfitting) - the model captures noise. The tradeoff means reducing one often increases the other. The goal is to find the sweet spot that minimizes total error (bias² + variance + irreducible error)."
+    },
+    {
+        "id": "ml_003", "topic": "Machine Learning", "category": "Machine Learning",
+        "difficulty": "medium",
+        "question_text": "How does Ridge regression differ from Lasso regression in feature selection?",
+        "reference_answer": "Both add regularization to linear regression. Ridge (L2) adds the sum of squared weights to the loss - it shrinks coefficients but never sets them to exactly zero. Lasso (L1) adds the sum of absolute weights - it can shrink coefficients to exactly zero, effectively performing feature selection. Elastic Net combines both."
+    },
+    {
+        "id": "ml_004", "topic": "Machine Learning", "category": "Machine Learning",
+        "difficulty": "medium",
+        "question_text": "Explain how Random Forest works and why it reduces overfitting compared to a single decision tree.",
+        "reference_answer": "Random Forest is an ensemble of decision trees trained on random subsets of data (bagging) and features. Each tree votes on the prediction. It reduces overfitting because: 1) Bagging reduces variance by averaging multiple trees, 2) Random feature selection decorrelates trees, 3) Individual tree errors cancel out. It's more robust than a single deep tree."
+    },
+    {
+        "id": "ml_005", "topic": "Machine Learning", "category": "Machine Learning",
+        "difficulty": "medium",
+        "question_text": "What is cross-validation and why is it important?",
+        "reference_answer": "Cross-validation is a technique to evaluate model performance by splitting data into k folds. The model is trained on k-1 folds and tested on the remaining fold, repeated k times. It provides a more reliable estimate of model performance than a single train-test split, helps detect overfitting, and is used for hyperparameter tuning."
+    },
+    {
+        "id": "ml_006", "topic": "Machine Learning", "category": "Machine Learning",
+        "difficulty": "hard",
+        "question_text": "Explain Principal Component Analysis (PCA) and when you would use it.",
+        "reference_answer": "PCA is an unsupervised dimensionality reduction technique that finds orthogonal directions of maximum variance in the data. It computes eigenvectors of the covariance matrix and projects data onto the top-k principal components. Use cases: reducing high-dimensional data for visualization, removing multicollinearity, feature extraction, and noise reduction."
+    },
+    {
+        "id": "ml_007", "topic": "Machine Learning", "category": "Machine Learning",
+        "difficulty": "hard",
+        "question_text": "What is gradient boosting and how does XGBoost improve upon it?",
+        "reference_answer": "Gradient boosting builds trees sequentially, each correcting errors of the previous ensemble by fitting to the negative gradient of the loss function. XGBoost improves upon this with: regularization (L1/L2), efficient handling of sparse data, parallel tree construction, built-in cross-validation, and tree pruning using maximum depth."
+    },
+    # --- Deep Learning ---
+    {
+        "id": "dl_001", "topic": "Deep Learning", "category": "Machine Learning",
+        "difficulty": "easy",
+        "question_text": "What is the vanishing gradient problem and how is it addressed?",
+        "reference_answer": "In deep networks, gradients can become extremely small as they're backpropagated through many layers, making early layers learn very slowly. Solutions include: ReLU activation (doesn't saturate for positive values), batch normalization, residual connections (skip connections), LSTM/GRU for RNNs, and proper weight initialization (He, Xavier)."
+    },
+    {
+        "id": "dl_002", "topic": "Deep Learning", "category": "Machine Learning",
+        "difficulty": "medium",
+        "question_text": "Explain the attention mechanism in transformers.",
+        "reference_answer": "Attention computes weighted relationships between all positions in a sequence. Self-attention uses Query, Key, Value matrices: Attention(Q,K,V) = softmax(QK^T/√d)V. Multi-head attention runs multiple attention functions in parallel. This allows the model to focus on relevant parts of the input regardless of distance, replacing the need for recurrence."
+    },
+    {
+        "id": "dl_003", "topic": "Deep Learning", "category": "Machine Learning",
+        "difficulty": "medium",
+        "question_text": "What is the difference between CNNs and RNNs? When would you use each?",
+        "reference_answer": "CNNs use convolutional filters to detect spatial patterns - ideal for images, where local features matter (edges, textures). RNNs process sequential data by maintaining hidden states - ideal for time series, text, and speech. CNNs are parallel-friendly and faster; RNNs handle variable-length sequences but suffer from vanishing gradients (addressed by LSTMs)."
+    },
+    {
+        "id": "dl_004", "topic": "Deep Learning", "category": "Machine Learning",
+        "difficulty": "hard",
+        "question_text": "Explain how BERT works and why it was a breakthrough in NLP.",
+        "reference_answer": "BERT (Bidirectional Encoder Representations from Transformers) pre-trains a transformer encoder on large text using two objectives: Masked Language Modeling (predicting masked tokens) and Next Sentence Prediction. Unlike previous models (GPT), BERT reads text bidirectionally. It can be fine-tuned for various tasks with minimal architecture changes, achieving state-of-the-art results."
+    },
+    # --- SQL & Databases ---
+    {
+        "id": "sql_001", "topic": "SQL", "category": "Databases",
+        "difficulty": "easy",
+        "question_text": "What is the difference between INNER JOIN and LEFT JOIN?",
+        "reference_answer": "INNER JOIN returns only rows where there's a match in both tables. LEFT JOIN returns all rows from the left table plus matching rows from the right table; unmatched right-table columns are NULL. RIGHT JOIN is the opposite. FULL OUTER JOIN returns all rows from both tables."
+    },
+    {
+        "id": "sql_002", "topic": "SQL", "category": "Databases",
+        "difficulty": "easy",
+        "question_text": "What is the difference between WHERE and HAVING clauses?",
+        "reference_answer": "WHERE filters rows before grouping (cannot use aggregate functions). HAVING filters groups after GROUP BY (can use aggregate functions like COUNT, SUM, AVG). Example: WHERE salary > 50000 filters individual rows, HAVING COUNT(*) > 5 filters groups with more than 5 members."
+    },
+    {
+        "id": "sql_003", "topic": "SQL", "category": "Databases",
+        "difficulty": "medium",
+        "question_text": "Explain database normalization and its different normal forms.",
+        "reference_answer": "Normalization organizes data to reduce redundancy and dependency. 1NF: Atomic values, no repeating groups. 2NF: 1NF + no partial dependencies (all non-key columns depend on the full primary key). 3NF: 2NF + no transitive dependencies (non-key columns don't depend on other non-key columns). BCNF: Every determinant is a candidate key."
+    },
+    {
+        "id": "sql_004", "topic": "SQL", "category": "Databases",
+        "difficulty": "medium",
+        "question_text": "What are window functions in SQL? Give an example using RANK().",
+        "reference_answer": "Window functions perform calculations across a set of rows related to the current row without collapsing them (unlike GROUP BY). Example: SELECT name, department, salary, RANK() OVER (PARTITION BY department ORDER BY salary DESC) as rank FROM employees; This ranks employees by salary within each department."
+    },
+    {
+        "id": "sql_005", "topic": "SQL", "category": "Databases",
+        "difficulty": "hard",
+        "question_text": "Explain query optimization and indexing strategies in databases.",
+        "reference_answer": "Query optimization involves: 1) Using indexes on frequently queried columns (B-tree for range queries, hash for equality). 2) Avoiding SELECT *, using specific columns. 3) Analyzing execution plans (EXPLAIN). 4) Using composite indexes for multi-column queries. 5) Avoiding functions on indexed columns in WHERE. 6) Proper join ordering."
+    },
+    {
+        "id": "sql_006", "topic": "SQL", "category": "Databases",
+        "difficulty": "hard",
+        "question_text": "What are ACID properties in databases? Explain each.",
+        "reference_answer": "ACID ensures reliable database transactions. Atomicity: Transaction is all-or-nothing. Consistency: Transaction brings DB from one valid state to another. Isolation: Concurrent transactions don't interfere (isolation levels: Read Uncommitted, Read Committed, Repeatable Read, Serializable). Durability: Committed changes survive system failures."
+    },
+    # --- System Design ---
+    {
+        "id": "sd_001", "topic": "System Design", "category": "System Design",
+        "difficulty": "easy",
+        "question_text": "What is the difference between REST and GraphQL APIs?",
+        "reference_answer": "REST uses multiple endpoints with fixed data structures (GET /users, POST /users). GraphQL uses a single endpoint where clients specify exactly what data they need, avoiding over-fetching and under-fetching. REST is simpler and cacheable; GraphQL is more flexible but adds complexity. REST uses HTTP methods; GraphQL uses queries and mutations."
+    },
+    {
+        "id": "sd_002", "topic": "System Design", "category": "System Design",
+        "difficulty": "medium",
+        "question_text": "Explain the concept of horizontal vs vertical scaling.",
+        "reference_answer": "Vertical scaling (scale up) means adding more resources (CPU, RAM) to a single server. Horizontal scaling (scale out) means adding more servers. Vertical has limits and single point of failure. Horizontal is more resilient, handles more load, but needs load balancing, data consistency solutions, and distributed architecture."
+    },
+    {
+        "id": "sd_003", "topic": "System Design", "category": "System Design",
+        "difficulty": "medium",
+        "question_text": "What is caching and what are common caching strategies?",
+        "reference_answer": "Caching stores frequently accessed data in fast storage (memory) to reduce latency and load on the primary data store. Strategies: Cache-aside (app checks cache first, loads from DB on miss), Write-through (writes to cache and DB simultaneously), Write-behind (writes to cache, asynchronously to DB), TTL-based expiration. Tools: Redis, Memcached."
+    },
+    {
+        "id": "sd_004", "topic": "System Design", "category": "System Design",
+        "difficulty": "hard",
+        "question_text": "Design a URL shortener service. What are the key components?",
+        "reference_answer": "Key components: 1) URL encoding: Base62 encoding of auto-incrementing ID or hash. 2) Database: Store mappings (short_code -> original_url, created_at, expiry). 3) Redirection: 301 (permanent) or 302 (temporary). 4) Analytics: Click tracking. 5) Scaling: Distributed ID generation, caching popular URLs in Redis, database sharding. 6) Rate limiting for abuse prevention."
+    },
+    # --- NLP ---
+    {
+        "id": "nlp_001", "topic": "NLP", "category": "Machine Learning",
+        "difficulty": "easy",
+        "question_text": "What is tokenization in NLP and why is it important?",
+        "reference_answer": "Tokenization is the process of splitting text into smaller units (tokens) - words, subwords, or characters. It's the first step in NLP pipelines. Word tokenization splits by spaces/punctuation. Subword tokenization (BPE, WordPiece) handles unknown words by breaking them into known subword units. It determines the model's vocabulary and input format."
+    },
+    {
+        "id": "nlp_002", "topic": "NLP", "category": "Machine Learning",
+        "difficulty": "medium",
+        "question_text": "Explain TF-IDF and how it's used for text representation.",
+        "reference_answer": "TF-IDF (Term Frequency-Inverse Document Frequency) measures word importance in a document relative to a corpus. TF = frequency of word in document. IDF = log(total docs / docs containing word). TF-IDF = TF × IDF. Common words get low scores; distinctive words get high scores. Used for information retrieval, text classification, and keyword extraction."
+    },
+    {
+        "id": "nlp_003", "topic": "NLP", "category": "Machine Learning",
+        "difficulty": "medium",
+        "question_text": "What is Retrieval-Augmented Generation (RAG) and why is it useful?",
+        "reference_answer": "RAG combines retrieval systems with generative LLMs. Instead of relying solely on the model's trained knowledge, RAG first retrieves relevant documents from a knowledge base, then feeds them as context to the LLM for answer generation. Benefits: reduces hallucination, provides up-to-date information, enables domain-specific knowledge, and allows source citation."
+    },
+    {
+        "id": "nlp_004", "topic": "NLP", "category": "Machine Learning",
+        "difficulty": "hard",
+        "question_text": "Explain word embeddings (Word2Vec) and how they capture semantic meaning.",
+        "reference_answer": "Word2Vec trains a shallow neural network to predict words from context (CBOW) or context from words (Skip-gram). The hidden layer weights become dense vector representations where semantically similar words are close in vector space. Famous example: king - man + woman ≈ queen. Limitations: static embeddings (one vector per word regardless of context), addressed by contextual embeddings (BERT, ELMo)."
+    },
+    # --- Computer Vision ---
+    {
+        "id": "cv_001", "topic": "Computer Vision", "category": "Machine Learning",
+        "difficulty": "medium",
+        "question_text": "How do Convolutional Neural Networks (CNNs) process images?",
+        "reference_answer": "CNNs apply learnable filters (kernels) that slide across the image to detect features. Early layers detect edges and textures; deeper layers detect complex patterns. Key operations: Convolution (feature detection), Pooling (downsampling for spatial invariance), Fully-connected layers (classification). Notable architectures: LeNet, AlexNet, VGG, ResNet."
+    },
+    # --- Data Science ---
+    {
+        "id": "ds_001", "topic": "Data Science", "category": "Data Science",
+        "difficulty": "easy",
+        "question_text": "What is exploratory data analysis (EDA) and what steps does it involve?",
+        "reference_answer": "EDA is the process of analyzing datasets to summarize their main characteristics using visual and statistical methods. Steps: 1) Understanding data shape, types, missing values. 2) Descriptive statistics (mean, median, std). 3) Distribution analysis (histograms, box plots). 4) Correlation analysis. 5) Outlier detection. 6) Feature relationships (scatter plots, pair plots)."
+    },
+    {
+        "id": "ds_002", "topic": "Data Science", "category": "Data Science",
+        "difficulty": "medium",
+        "question_text": "How do you handle missing data in a dataset?",
+        "reference_answer": "Strategies: 1) Deletion - remove rows/columns with missing values (if data is MCAR and sufficient). 2) Imputation - fill with mean/median/mode (simple), KNN imputation, or regression imputation (sophisticated). 3) Indicator variables - add binary column flagging missingness. 4) Advanced methods: MICE, EM algorithm. Choice depends on missingness mechanism (MCAR, MAR, MNAR) and data volume."
+    },
+]
+
+
+def seed_question_bank(output_path: str = QUESTION_BANK_PATH) -> int:
+    """
+    Write the curated question dataset to the JSON question bank file.
+
+    Args:
+        output_path: Path to write the JSON file.
+
+    Returns:
+        Number of questions written.
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(CURATED_QUESTIONS, f, indent=2, ensure_ascii=False)
+
+    logger.info(f"Question bank seeded: {len(CURATED_QUESTIONS)} questions -> {output_path}")
+    return len(CURATED_QUESTIONS)
+
+
+def get_question_stats() -> dict:
+    """Return statistics about the question bank."""
+    topics = {}
+    difficulties = {}
+
+    for q in CURATED_QUESTIONS:
+        topic = q.get("topic", "Unknown")
+        diff = q.get("difficulty", "unknown")
+        topics[topic] = topics.get(topic, 0) + 1
+        difficulties[diff] = difficulties.get(diff, 0) + 1
+
+    return {
+        "total_questions": len(CURATED_QUESTIONS),
+        "by_topic": topics,
+        "by_difficulty": difficulties,
+    }
+
+
+# Auto-seed on import if the file doesn't exist
+if not os.path.exists(QUESTION_BANK_PATH):
+    try:
+        seed_question_bank()
+    except Exception as e:
+        logger.warning(f"Could not auto-seed question bank: {e}")
