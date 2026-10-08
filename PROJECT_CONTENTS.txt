@@ -1,0 +1,590 @@
+================================================================================
+           INTELLIGENT ACADEMIC & CAREER COPILOT (RAG + ML)
+                     MAJOR PROJECT MID-TERM REPORT
+================================================================================
+
+Project Code    : PR1107
+Institution     : Institute of Engineering and Technology (IET),
+                  JK Lakshmipat University (JKLU), Jaipur
+Faculty Guide   : Prof. Devendra Bhavsar
+Team Members    : Nakul Ranka     (Roll No: 2023Btech050)
+                  Prateek Goswami (Roll No: 2023Btech058)
+                  Siddharth Ranka (Roll No: 2023Btech082)
+Date            : October 2026
+Status          : Mid-Term Evaluation Submission
+
+
+================================================================================
+                             TABLE OF CONTENTS
+================================================================================
+
+1   Abstract ................................................................ 2
+2   Introduction ............................................................ 3
+3   Problem Statement ....................................................... 4
+4   Dataset ................................................................. 5
+5   System Architecture ..................................................... 6
+6   Work Completed Till Mid-Term ............................................ 7
+    6.1 Research and Design ................................................. 7
+    6.2 Backend ............................................................. 8
+    6.3 Frontend ............................................................ 9
+7   Plan for Remaining Project Timeline .................................... 10
+8   Risks and Challenges ................................................... 11
+9   Appendix ............................................................... 12
+    9.1 References ......................................................... 12
+
+
+================================================================================
+1. ABSTRACT                                                             [Page 2]
+================================================================================
+
+In modern engineering education, students frequently encounter a disconnect
+between formal curriculum examinations and industry-grade technical recruitment
+processes. Existing pedagogical aids and general-purpose large language model
+(LLM) conversational agents are primarily one-directional, lack grounding in
+university syllabi, and fail to provide quantitative diagnostics regarding
+conceptual deficiencies. 
+
+This project introduces the "Intelligent Academic & Career Copilot", an end-to-
+end academic tutoring and career acceleration system that tightly couples
+Retrieval-Augmented Generation (RAG) with Supervised Machine Learning (ML).
+The platform ingests heterogeneous academic documents (syllabi, lecture notes,
+presentation decks, and past question papers) alongside student resumes. It
+facilitates syllabus-grounded academic question-answering and conducts adaptive
+mock technical interviews tailored to specific target Job Descriptions (JDs)
+mined from industry platforms.
+
+To overcome the retrieval limitations of technical acronyms and semantic
+queries, the system deploys a Hybrid Retrieval Engine combining lexical BM25
+matching with dense Sentence-Transformer vector embeddings merged via Reciprocal
+Rank Fusion (RRF). Candidate interview responses are evaluated across six
+quantitative dimensions (semantic accuracy, response latency, length curve,
+technical keyword coverage, linguistic confidence, and sentence completeness)
+using a VotingRegressor ensemble of Random Forest and Extreme Gradient Boosting
+(XGBoost), achieving an RMSE of ~0.06 and an R^2 score of ~0.93.
+
+The central contribution of this system is an automated closed-loop remediation
+engine: upon detecting topic-level weaknesses (e.g., scoring < 70%), the platform
+queries the student's personal indexed notes to retrieve precise remediation
+passages, constructs a structured study timetable, and dynamically generates
+calibrated re-testing assessments. Built upon a zero-cost architecture leveraging
+open-weight models, local CPU vector embeddings, and an asynchronous FastAPI and
+Streamlit architecture, the copilot provides an enterprise-quality, accessible
+tool for engineering students.
+
+
+================================================================================
+2. INTRODUCTION                                                         [Page 3]
+================================================================================
+
+The transition from undergraduate engineering coursework to professional software
+and data engineering employment demands dual mastery: rigorous academic
+comprehension of fundamental computer science principles and agile, real-time
+communication during technical interviews. Traditional university environments
+provide lecture slides, syllabi, and textbooks, yet students struggle to synthesize
+these materials effectively when preparing for examinations and recruitment
+assessments.
+
+Simultaneously, while the advent of Generative AI has made tools like ChatGPT,
+Claude, and Gemini ubiquitous, their application in targeted student learning
+suffers from significant constraints:
+1. Hallucination and Lack of Course Context: General LLMs possess broad world
+   knowledge but lack awareness of a student's exact course syllabus, specific
+   faculty lecture notes, and particular examination emphasis.
+2. Passive Consumption vs. Active Assessment: Existing study assistants act as
+   passive encyclopedias. They answer questions on demand but do not
+   interrogate the student to assess whether prerequisites are internalized.
+3. Absence of Quantitative Diagnostics: General chatbots cannot measure response
+   latency, keyword completeness, or conceptual depth, nor do they calculate
+   domain-level competency scores (e.g., Python: 82%, Database SQL: 61%).
+4. Disconnected Feedback Loop: When a student fails a technical question, no
+   automated mechanism links the diagnostic failure back to the relevant slide
+   or section in the student's course pack.
+
+The Intelligent Academic & Career Copilot solves this paradigm by establishing
+a symbiotic RAG-ML framework designed specifically for engineering undergraduates:
+- Module 1 (Document Intelligence): Ingests and processes multi-format files
+  (.pdf, .docx, .pptx, .txt, .md) using structure-aware chunking.
+- Module 2 (RAG Assistant): Powers context-grounded Q&A via hybrid BM25 + dense
+  vector search with reciprocal rank fusion and local open-weight generation.
+- Module 3 (AI Interviewer): Maps student resumes against job descriptions,
+  extracts skill gaps across 12+ tech disciplines, and manages stateful mock
+  interview sessions.
+- Module 4 (ML Scoring & Adaptive Loop): Evaluates answers using supervised ML,
+  diagnoses weak sub-domains, and generates customized study guides linked to
+  the student's personal notes.
+
+By executing this complete pipeline locally and via free-tier inference APIs,
+the project provides institutional-grade intelligence without recurring API costs.
+
+
+================================================================================
+3. PROBLEM STATEMENT                                                    [Page 4]
+================================================================================
+
+Engineering students preparing for academic assessments and technical campus
+placements face four fundamental bottlenecks:
+
+1. Generic Preparation Without Curricular Grounding:
+   Commercial question banks (e.g., LeetCode, GeeksforGeeks, AmbitionBox) provide
+   isolated questions that do not reflect the specific depth, modular division,
+   or terminology emphasized in a university syllabus. Conversely, standard
+   chatbots generate generic explanations that may contradict or diverge from
+   the prescribed lecture materials.
+
+2. One-Way Passive Interaction:
+   Conventional study aids operate unilaterally—students ask questions, and the
+   system provides answers. Active recall, spaced repetition, and viva-style
+   inquisition are absent. Students frequently experience the "illusion of
+   competence," assuming comprehension until confronted with a rigorous technical
+   interviewer.
+
+3. Lack of Multi-Dimensional Objective Scoring:
+   Existing assessment platforms evaluate technical responses using either binary
+   unit tests (for code syntax) or subjective LLM prompts. They lack fine-grained
+   numerical modeling of essential interview parameters, including semantic
+   fidelity to ground-truth answers, answer concise-to-complete ratios, response
+   latency, technical vocabulary coverage, and communicative confidence.
+
+4. Absence of a Closed-Loop Remediation Cycle:
+   Current educational software terminates once a test is graded. There is no
+   closed-loop feedback mechanism that:
+   (a) Diagnoses the granular topic-level weakness (e.g., "SQL Window Functions"),
+   (b) Retrieves the student's own previously uploaded lecture notes containing
+       that concept,
+   (c) Prescribes targeted revision timeframes, and
+   (d) Re-tests the candidate adaptively on that deficient topic.
+
+FORMAL OBJECTIVE:
+"To design, develop, and validate an intelligent academic and career copilot that
+leverages hybrid Retrieval-Augmented Generation (BM25 + Dense Vectors) and
+Supervised Ensemble Machine Learning (Random Forest + XGBoost) to parse academic
+documents, conduct resume- and JD-aligned technical interviews, score candidate
+responses across multi-dimensional metrics, and close the learning gap through
+an automated adaptive remediation and re-testing loop."
+
+
+================================================================================
+5. DATASET                                                              [Page 5]
+================================================================================
+
+The system operates over three distinct categories of datasets: heterogeneous
+academic documents, an industry technical question bank, and a synthetic ML
+training response corpus.
+
+1. Academic Document Corpus (User-Ingested & Evaluation Materials):
+   - Multi-Format Inputs: Course syllabi, slide presentations, assignments,
+     and past examination papers in .pdf, .docx, .pptx, .txt, and .md formats.
+   - Text Extraction & Chaining:
+     * PDF documents: Processed via PyPDF2 with page-by-page text extraction.
+     * DOCX documents: Paragraph and table parsing via python-docx.
+     * PPTX presentations: Slide and shape text extraction via python-pptx.
+   - Metadata Schema: Each extracted text chunk is tagged with:
+     * chunk_id       : Unique UUIDv4 identifier
+     * source_file    : Original filename (e.g., "DBMS_Unit_4.pdf")
+     * doc_type       : Categorization ("syllabus", "notes", "resume", "exam")
+     * section_title  : Heading or slide title extracted via regex
+     * page_number    : Page or slide index
+     * chunk_index    : Sequential offset within document
+   - Chunking Strategy: Heading-aware splitting with a standard window of 512
+     words and a 64-word sliding overlap to prevent boundary truncation.
+
+2. Industry Interview Question Bank:
+   - Sourced and curated from real interview experiences on career platforms
+     (AmbitionBox, GeeksforGeeks, and technical interview records).
+   - Contains 40+ verified technical questions spanning 9 engineering domains:
+     * Python Core                (7 questions: GIL, decorators, generators, etc.)
+     * Data Structures & Algorithms (6 questions: DP, trees, graphs, hashing)
+     * Machine Learning Theory     (7 questions: Bias-variance, PCA, regularization)
+     * Deep Learning              (4 questions: Backpropagation, CNNs, transformers)
+     * SQL & Relational Databases (6 questions: Joins, indexing, ACID, windowing)
+     * System Design              (4 questions: CAP theorem, caching, sharding)
+     * Natural Language Processing(4 questions: Tokenization, BERT, embeddings)
+     * Computer Vision            (1 question: Convolutional filters)
+     * Data Science Principles    (2 questions: Imbalanced data, feature scaling)
+   - Schema per Entry:
+     {
+       "question_id": "ml_001",
+       "topic": "Machine Learning",
+       "difficulty": "Medium",
+       "question": "Explain the bias-variance tradeoff...",
+       "reference_answer": "The bias-variance tradeoff is the property...",
+       "expected_keywords": ["underfitting", "overfitting", "model complexity"]
+     }
+
+3. Synthetic Candidate Response Training Dataset:
+   - Composed of 500 feature-engineered training vectors spanning 5 distinct
+     answer quality tiers:
+     * Excellent (Score: 0.85 - 1.00) : High semantic match, fast, rich keywords
+     * Good      (Score: 0.70 - 0.84) : Sound concepts, minor phrasing gaps
+     * Average   (Score: 0.50 - 0.69) : Partially correct, moderate latency
+     * Poor      (Score: 0.30 - 0.49) : Vague, hedging language, low keywords
+     * Bad       (Score: 0.00 - 0.29) : Irrelevant, incorrect, or empty
+   - Used to train the VotingRegressor ensemble prior to collecting live data.
+
+4. Evaluation Benchmark Set:
+   - 5 standardized technical anchor queries (PCA, ACID Properties, Transformers,
+     Bias-Variance, Hash Table Collisions) with ground-truth answers for RAGAS
+     and TruLens evaluation.
+
+
+================================================================================
+5. SYSTEM ARCHITECTURE                                                  [Page 6]
+================================================================================
+
+The copilot is structured into five cohesive layers designed for high modularity,
+maintainability, and zero-cost local execution.
+
+--------------------------------------------------------------------------------
+                   HIGH-LEVEL ARCHITECTURAL DIAGRAM
+--------------------------------------------------------------------------------
+
++-----------------------------------------------------------------------------+
+|                      PRESENTATION LAYER (Streamlit UI)                      |
+|   [Upload View]       [Chat Q&A View]    [Interview View]   [Dashboard]     |
++-----------------------------------------------------------------------------+
+                                       | HTTP / REST
++-----------------------------------------------------------------------------+
+|                       API LAYER (FastAPI Framework)                         |
+|   POST /upload        POST /ask          POST /interview    POST /score     |
+|   GET  /interview/{id}                   GET  /score/{session_id}           |
++-----------------------------------------------------------------------------+
+               |                       |                     |
++--------------v-----------------------v---------------------v----------------+
+|                           CORE PROCESSING ENGINES                           |
+|                                                                             |
+| [Module 1: Doc Intelligence]      [Module 2: RAG Assistant Engine]          |
+|  - Multi-Format Parser (PDF/DOCX)  - Sentence-Transformers (all-MiniLM-L6)  |
+|  - Structure-Aware Text Chunker    - BM25Okapi Lexical Index                |
+|                                    - Reciprocal Rank Fusion (RRF k=60)      |
+|                                    - Mistral-7B / Zephyr-7B LLM Generator   |
+|                                                                             |
+| [Module 3: AI Interviewer]        [Module 4: ML Scoring & Feedback]         |
+|  - Skill Taxonomy (12+ domains)    - 6-Dimensional Feature Extractor        |
+|  - Resume & JD Skill-Gap Matcher   - VotingRegressor (RandomForest+XGBoost) |
+|  - Stateful Session Controller     - Adaptive Note Retrieval & Study Plan   |
++-----------------------------------------------------------------------------+
+               |                                             |
++--------------v---------------------------------------------v----------------+
+|                         PERSISTENCE & STORAGE LAYER                         |
+|   ChromaDB (Vector Store)          | SQLite Database (Relational Store)     |
+|   - Personal Document Embeddings   | - Interview Session Checkpoints        |
+|   - HNSW Cosine Index On-Disk      | - Performance Scores & Topic History   |
++-----------------------------------------------------------------------------+
+                                       |
++-----------------------------------------------------------------------------+
+|                      EVALUATION & RELIABILITY LAYER                         |
+|   - RAGAS (Context Precision, Recall, Faithfulness, Answer Relevance)       |
+|   - TruLens Groundedness Verification (Hallucination Detection Guard)       |
+|   - Dual-Model LLM Fallback (Mistral-7B -> Zephyr-7B -> Local Template)    |
+|   - Resilient Session Recovery via SQLite Serialized Checkpoints           |
++-----------------------------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+                     DETAILED DATA & EXECUTION SEQUENCE
+--------------------------------------------------------------------------------
+
+1. Ingestion: User uploads syllabus/notes via UI -> API parses via PyPDF2/DOCX ->
+   Chunker splits into 512-word chunks -> Local Sentence-Transformers encodes
+   vectors -> Simultaneously stored in ChromaDB (HNSW) and BM25 memory index.
+2. Academic Q&A: User asks question -> Hybrid Retriever executes BM25 and dense
+   vector search -> Merges rankings via Reciprocal Rank Fusion (RRF) -> Injects
+   top chunks into Mistral-7B prompt -> LLM returns answer with source citations.
+3. Interview Session: User submits resume + JD -> Role Matcher identifies missing
+   skills -> Question Generator compiles 10 difficulty-mixed questions -> UI
+   presents questions with countdown timer.
+4. Scoring & Diagnosis: User submits answer -> Feature Extractor computes 6
+   features -> VotingRegressor scores answer (0.0-1.0) and assigns grade -> State
+   checkpointed to SQLite -> Topic averages updated.
+5. Adaptive Loop: System detects topics < 70% -> Queries ChromaDB for student's
+   own notes on weak topics -> Generates structured study plan and targeted
+   retesting questions -> Displayed on interactive Plotly dashboard.
+
+
+================================================================================
+6. WORK COMPLETED TILL MID-TERM                                         [Page 7]
+================================================================================
+
+By the mid-term milestone, the repository consists of ~35 files, exceeding 5,300
+lines of clean, modular, and thoroughly tested Python code.
+
+--------------------------------------------------------------------------------
+6.1 RESEARCH AND DESIGN                                                 [Page 7]
+--------------------------------------------------------------------------------
+
+1. Retrieval Strategy Research:
+   - Conducted comparative analysis between Pure Dense Vector Retrieval (FAISS/
+     ChromaDB) and Sparse Lexical Retrieval (BM25Okapi).
+   - Identified that technical academic queries containing acronyms ("PCA",
+     "ACID", "GIL", "BFS", "DAG") suffer from semantic dilution in dense-only
+     systems.
+   - Designed a Hybrid Search Pipeline employing Reciprocal Rank Fusion (RRF):
+       RRF_score(d) = [0.4 / (60 + rank_BM25(d))] + [0.6 / (60 + rank_Dense(d))]
+     This ensures exact technical term retention while preserving semantic nuance.
+
+2. Cost & Latency Optimization:
+   - Designed a zero-cost architecture utilizing the Hugging Face Serverless
+     Inference API for LLM generation (Mistral-7B-Instruct-v0.3) paired with an
+     in-process, CPU-optimized embedding model (`all-MiniLM-L6-v2`, 384 dimensions).
+   - Formulated a dual-model fallback mechanism (Mistral-7B -> Zephyr-7B-beta)
+     to maintain 100% uptime during cold starts or free-tier rate limits.
+
+3. Skill Taxonomy & Role Matching Formulation:
+   - Developed a hierarchical skill taxonomy spanning 12 core domains and over
+     100 technical keywords with regex word-boundary isolation.
+   - Built predefined profiles for 8 target industry roles (Machine Learning
+     Engineer, Data Scientist, Backend Developer, Frontend Developer, Full Stack
+     Engineer, DevOps Engineer, Data Analyst, Software Engineer).
+
+4. Multi-Feature Scoring Formulation:
+   - Engineered a 6-parameter scoring model replacing subjective LLM grading:
+     * Feature 1: Semantic Cosine Similarity against reference solution (weight 0.40)
+     * Feature 2: Response Latency Curve (5s=0.9, 30s=0.85, 60s=0.75, 120s=0.40)
+     * Feature 3: Answer Word Length Curve (bell-shaped, peak at 30-120 words)
+     * Feature 4: Technical Keyword Coverage percentage
+     * Feature 5: Linguistic Confidence Heuristic (ratio of assertive to hedge terms)
+     * Feature 6: Completeness Score (sentence structure and syntactic closure)
+
+--------------------------------------------------------------------------------
+6.2 BACKEND IMPLEMENTATION                                              [Page 8]
+--------------------------------------------------------------------------------
+
+The backend is developed with FastAPI and organized into four core modules:
+
+1. Module 1: Document Intelligence (`src/document_intelligence/`)
+   - `parser.py`: Multi-format parsing engine supporting PDF, DOCX, PPTX, TXT,
+     and MD. Implements graceful degradation—corrupt pages or unreadable slides
+     are isolated and logged without terminating the ingestion batch.
+   - `chunker.py`: Structure-aware text splitter that preserves markdown
+     headings and presentation slide boundaries. Uses a 512-word target chunk
+     size with 64-word overlap, tagging each chunk with UUID and document metadata.
+
+2. Module 2: RAG Assistant (`src/rag_assistant/`)
+   - `embeddings.py`: Wrapper for Sentence-Transformers (`all-MiniLM-L6-v2`).
+     Executes on CPU with L2 vector normalization and batch processing.
+   - `hybrid_retriever.py`: Integrates on-disk ChromaDB (`hnsw:space: cosine`)
+     with an in-memory `BM25Okapi` index. Provides hybrid search via RRF,
+     collection-level metadata filtering, and automatic index synchronization.
+   - `generator.py`: Hugging Face `InferenceClient` integration managing prompt
+     construction, source citation formatting, and automatic dual-model fallback.
+
+3. Module 3: AI Interviewer (`src/interviewer/`)
+   - `role_matcher.py`: Extracts candidate skills from resumes and job descriptions,
+     computes intersection and difference sets, and outputs skill-gap metrics.
+   - `question_generator.py`: Stateful interview session controller supporting
+     calibrated difficulty distribution (25% Easy, 50% Medium, 25% Hard).
+   - `scraper_pipeline.py`: Auto-seeding question bank pipeline storing 40+
+     curated technical questions with metadata and answer benchmarks.
+
+4. Module 4: ML Scoring Pipeline (`src/ml_scoring/`)
+   - `feature_extractor.py`: Computes the 6 numerical features per submission.
+   - `model.py`: Trained VotingRegressor ensemble combining Random Forest and
+     XGBoost. Evaluated on test splits: RMSE: ~0.06, R^2: ~0.93, MAE: ~0.05.
+   - `recommendation_engine.py`: Identifies weak topics (< 70%), categorizes
+     severity (Critical < 40%, Moderate 40-60%, Mild 60-70%), builds targeted study
+     plans with estimated hours, and triggers dynamic note retrieval via RAG.
+
+5. API Routing Layer (`src/api/routes/`) & Utilities:
+   - `upload.py`: Multipart document ingestion and ChromaDB indexing.
+   - `ask.py`: RAG question-answering with source metadata citations.
+   - `interview.py`: Session initialization, question delivery, and answer capture.
+   - `score.py`: Real-time answer scoring and session-level analytics generation.
+   - `checkpoint.py`: SQLite-backed state serialization ensuring zero progress
+     loss during client disconnections.
+   - `logger.py`: Centralized structured logging across all services.
+
+6. Testing & Quality Assurance:
+   - 22 unit and integration tests across `test_parser.py`, `test_rag.py`, and
+     `test_scoring.py` with 100% pass rate.
+   - Evaluation scripts: `eval_ragas.py` (faithfulness, relevance) and
+     `eval_trulens.py` (groundedness and hallucination detection).
+
+--------------------------------------------------------------------------------
+6.3 FRONTEND IMPLEMENTATION                                             [Page 9]
+--------------------------------------------------------------------------------
+
+The frontend is implemented as a multi-page Streamlit application (`ui/`)
+featuring custom CSS styling, responsive layout containers, and interactive
+Plotly visualizations.
+
+1. Document Upload View (`ui/views/upload_view.py`):
+   - Drag-and-drop file uploader supporting PDF, DOCX, PPTX, TXT, and MD.
+   - Document type selector (Syllabus, Lecture Notes, Resume, Exam Paper).
+   - Real-time indexing progress bar and document chunk summary metrics.
+   - History card displaying previously indexed files and collection names.
+
+2. Academic RAG Chat View (`ui/views/chat_view.py`):
+   - Conversational chat interface for curriculum Q&A.
+   - Sidebar controls for retrieval tuning: collection selection, document type
+     filter, and top_k slider.
+   - Formatted answers featuring expandable citation accordions displaying
+     source filename, page/slide number, and relevance confidence score.
+   - Conversation history persistence and clear-history controls.
+
+3. Interactive Mock Interview View (`ui/views/interview_view.py`):
+   - Interview setup wizard: target role selection, resume text ingestion,
+     job description matching, experience level, and question count selector.
+   - Active interview cockpit:
+     * Real-time JavaScript/Streamlit timer displaying elapsed seconds.
+     * Dynamic progress bar showing answered vs. remaining questions.
+     * Immediate per-question evaluation modal: numerical score (0-100%) and
+       letter grade (A+, A, B, C, F).
+     * Option to conclude interview early or proceed through all questions.
+   - Post-interview summary card presenting cumulative performance.
+
+4. Performance & Diagnostics Dashboard (`ui/views/dashboard_view.py`):
+   - Interactive Plotly Radar Chart mapping candidate skill mastery across all
+     tested technical competencies.
+   - Colored Plotly Bar Chart highlighting topic-by-topic percentages with
+     visual 70% threshold benchmark line.
+   - Weakness Diagnostic Panel: Badges classifying weak topics by severity
+     (Critical, Moderate, Mild).
+   - Personalized Study Plan: Actionable steps, estimated study hours, and
+     direct excerpts pulled from the student's personal notes via RAG.
+   - Adaptive Retesting Plan: Dynamically synthesized micro-quiz specs.
+   - New user demo preview mode illustrating dashboard analytics with sample data.
+
+
+================================================================================
+7. PLAN FOR REMAINING PROJECT TIMELINE                                 [Page 10]
+================================================================================
+
+The remaining timeline spans Weeks 7 through 10, concluding with final deployment,
+comprehensive benchmarking, and project defense preparation.
+
+--------------------------------------------------------------------------------
+MILESTONE ROADMAP
+--------------------------------------------------------------------------------
+
++-----------------+-----------------------------------+------------------------+
+| Phase / Week    | Planned Objectives & Tasks        | Target Deliverable     |
++-----------------+-----------------------------------+------------------------+
+| Week 7          | Automated Web Scraping Pipeline   | Dynamic scraper for    |
+| (Mid-Oct 2026)  | - Live crawler for AmbitionBox    | AmbitionBox/GFG;       |
+|                 |   and GeeksforGeeks questions.    | Expanded question bank |
+|                 | - Continuous question bank updater| (200+ questions across |
+|                 |   with automated deduplication.   | 15 domains).           |
++-----------------+-----------------------------------+------------------------+
+| Week 8          | Advanced Reranking & Retrieval    | Cross-Encoder reranker |
+| (Late-Oct 2026) | - Integrate neural Cross-Encoder  | pipeline;              |
+|                 |   (ms-marco-MiniLM-L-6-v2).       | Multi-query generation;|
+|                 | - Query decomposition and HyDE    | Context precision      |
+|                 |   (Hypothetical Document Embed).  | benchmark > 0.90.      |
++-----------------+-----------------------------------+------------------------+
+| Week 9          | Audio Speech-to-Text & Auth       | Whisper integration for|
+| (Early-Nov 2026)| - Real-time spoken interview mode | verbal mock interviews;|
+|                 |   using OpenAI Whisper / WebSpeech| JWT user auth and      |
+|                 | - Multi-user SQLite/PostgreSQL    | personalized user data |
+|                 |   authentication and profile sync.| isolation.             |
++-----------------+-----------------------------------+------------------------+
+| Week 10         | Cloud Deployment & Final Defense  | Live deployment on HF  |
+| (Mid-Nov 2026)  | - Containerize backend & frontend | Spaces / Render;       |
+|                 |   via Docker.                     | Final thesis report,   |
+|                 | - Full RAGAS benchmark execution. | video demonstration,   |
+|                 | - Final viva documentation.       | and project defense.   |
++-----------------+-----------------------------------+------------------------+
+
+
+================================================================================
+8. RISKS AND CHALLENGES                                                [Page 11]
+================================================================================
+
+Throughout development and forward planning, several technical and operational
+challenges have been identified, accompanied by concrete mitigation strategies:
+
+1. LLM API Rate Limits and Cold Starts:
+   - Risk: The free Hugging Face Serverless Inference API is subject to cold-start
+     delays (10-30 seconds) and sporadic hourly rate throttling.
+   - Mitigation: Implemented automatic dual-model failover (Mistral-7B -> Zephyr-7B).
+     For offline environments, local quantized inference using Ollama
+     (Mistral-7B-Instruct-Q4_K_M) serves as an alternative backend.
+
+2. Complex and Scanned Document Parsing:
+   - Risk: Scanned PDF lecture notes containing embedded diagrams, equations, or
+     handwriting cannot be parsed cleanly via PyPDF2.
+   - Mitigation: Deployed graceful error degradation that captures text from
+     valid pages without failing the entire file. Future enhancement includes
+     integrating Tesseract OCR / Surya OCR for scanned academic notes.
+
+3. Cold-Start Scarcity of Real Student Answer Data:
+   - Risk: Supervised ML models require labeled candidate responses, which are
+     scarce prior to broad institutional deployment.
+   - Mitigation: Synthesized a 500-sample balanced training set spanning 5
+     rigorous quality tiers. Designed an active learning logging pipeline where
+     real user interactions incrementally augment the training corpus.
+
+4. Network Latency in Real-Time Mock Interviews:
+   - Risk: High latency during answer submission degrades the realistic feel
+     of an interview simulation.
+   - Mitigation: Feature extraction is performed asynchronously on CPU using
+     cached embeddings. Session state is checkpointed in SQLite to guarantee
+     that client network drops do not lose interview progress.
+
+5. Hallucination Risk in Academic Answers:
+   - Risk: Generative LLMs might hallucinate explanations that confuse students
+     during critical exam preparation.
+   - Mitigation: The RAG engine enforces strict grounded system prompts requiring
+     direct citation of retrieved chunks. TruLens groundedness checks reject
+     answers with low context support score.
+
+
+================================================================================
+9. APPENDIX                                                            [Page 12]
+================================================================================
+
+--------------------------------------------------------------------------------
+9.1 REFERENCES                                                         [Page 12]
+--------------------------------------------------------------------------------
+
+[1] Lewis, P., Perez, E., Piktus, A., Petroni, F., Karpukhin, V., Goyal, N.,
+    Küttler, H., Lewis, M., Yih, W., Rocktäschel, T., Riedel, S., & Kiela, D.
+    (2020). "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks."
+    Advances in Neural Information Processing Systems (NeurIPS 2020), 33, 9459-9474.
+    arXiv:2005.11401.
+
+[2] Reimers, N., & Gurevych, I. (2019). "Sentence-BERT: Sentence Embeddings using
+    Siamese BERT-Networks." In Proceedings of the 2019 Conference on Empirical
+    Methods in Natural Language Processing (EMNLP-IJCNLP), pp. 3982-3992.
+    arXiv:1908.10084.
+
+[3] Robertson, S., Zaragoza, H., et al. (2009). "The Probabilistic Relevance
+    Framework: BM25 and Beyond." Foundations and Trends in Information Retrieval,
+    Vol. 3, No. 4, pp. 333-389.
+
+[4] Cormack, G. V., Clarke, C. L., & Buettcher, S. (2009). "Reciprocal Rank
+    Fusion outperforms Condorcet and individual Rank Learning Methods." In
+    Proceedings of the 32nd International ACM SIGIR Conference on Research and
+    Development in Information Retrieval (SIGIR '09), pp. 758-759.
+
+[5] Chen, T., & Guestrin, C. (2016). "XGBoost: A Scalable Tree Boosting System."
+    In Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge
+    Discovery and Data Mining (KDD '16), pp. 785-794. arXiv:1603.02754.
+
+[6] Breiman, L. (2001). "Random Forests." Machine Learning, Vol. 45, No. 1,
+    pp. 5-32.
+
+[7] Es, S., James, J., Espinosa-Anke, L., & Schockaert, S. (2023). "RAGAS:
+    Automated Evaluation of Retrieval Augmented Generation." arXiv:2309.15217.
+
+[8] Jiang, A. Q., Sablayrolles, A., Mensch, A., Bamford, C., Chaplot, D. S.,
+    Casas, D. de la, Bressand, F., Lengyel, G., Lample, G., Saulnier, L.,
+    Lavaud, L. R., Lachaux, M.-A., Stock, P., Scao, T. L., Lavril, T., Wang, T.,
+    Lacroix, T., & Sayed, W. E. (2023). "Mistral 7B." arXiv:2310.06825.
+
+[9] Meta AI. (2024). "Introducing Meta Llama 3: The Most Capable Openly Available
+    LLM to Date." Meta AI Research Blog.
+
+[10] Chroma Core Team. (2023). "Chroma: The AI-native open-source embedding
+     database." https://github.com/chroma-core/chroma.
+
+[11] TruEra Team. (2023). "TruLens: Open-source evaluation and tracking for
+     LLM applications." https://www.trulens.org/.
+
+[12] Tiangolo, S. (2018). "FastAPI: High performance, easy to learn, fast to
+     code, ready for production web framework." https://fastapi.tiangolo.com/.
+
+[13] Streamlit Inc. (2023). "Streamlit: A faster way to build and share data
+     apps." https://streamlit.io/.
+
+================================================================================
+                              END OF REPORT
+================================================================================

@@ -20,6 +20,13 @@ from src.utils.logger import get_logger
 load_dotenv()
 logger = get_logger(__name__)
 
+# LLM Provider & Credentials
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq").lower()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_PRIMARY_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+GROQ_FALLBACK_MODEL = os.getenv("GROQ_FALLBACK_MODEL", "openai/gpt-oss-20b")
+
+# Hugging Face Settings (Secondary Fallback)
 HF_API_TOKEN = os.getenv("HF_API_TOKEN", "")
 PRIMARY_MODEL = os.getenv("PRIMARY_LLM_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
 FALLBACK_MODEL = os.getenv("FALLBACK_LLM_MODEL", "HuggingFaceH4/zephyr-7b-beta")
@@ -238,13 +245,36 @@ def _call_llm(
     temperature: float = 0.3,
 ) -> tuple[str, str]:
     """
-    Call the LLM with automatic fallback.
+    Call the LLM with automatic multi-tier fallback (Groq -> HF -> graceful message).
 
     Returns:
         Tuple of (response_text, model_id_used).
     """
-    models_to_try = [PRIMARY_MODEL, FALLBACK_MODEL]
+    # 1. Try Groq if configured
+    if (LLM_PROVIDER == "groq" or GROQ_API_KEY) and GROQ_API_KEY.strip():
+        try:
+            from groq import Groq
+            client = Groq(api_key=GROQ_API_KEY.strip())
+            groq_models = [GROQ_PRIMARY_MODEL, GROQ_FALLBACK_MODEL, "qwen/qwen3.8-27b"]
+            for model_id in groq_models:
+                try:
+                    response = client.chat.completions.create(
+                        messages=messages,
+                        model=model_id,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                    )
+                    answer = response.choices[0].message.content
+                    logger.info(f"LLM response generated using Groq model {model_id}")
+                    return answer, f"groq:{model_id}"
+                except Exception as e:
+                    logger.warning(f"Groq model call failed for {model_id}: {e}")
+                    continue
+        except Exception as e:
+            logger.warning(f"Groq initialization/execution failed: {e}")
 
+    # 2. Try Hugging Face fallback
+    models_to_try = [PRIMARY_MODEL, FALLBACK_MODEL]
     for model_id in models_to_try:
         try:
             client = _get_client(model_id)
@@ -254,18 +284,18 @@ def _call_llm(
                 temperature=temperature,
             )
             answer = response.choices[0].message.content
-            logger.info(f"LLM response generated using {model_id}")
-            return answer, model_id
+            logger.info(f"LLM response generated using Hugging Face model {model_id}")
+            return answer, f"hf:{model_id}"
 
         except Exception as e:
-            logger.warning(f"LLM call failed for {model_id}: {e}")
+            logger.warning(f"Hugging Face call failed for {model_id}: {e}")
             continue
 
     # If all models fail, return a graceful error message
     logger.error("All LLM models failed. Returning fallback message.")
     return (
         "I'm unable to generate a response at the moment due to API limitations. "
-        "Please try again in a few moments, or check your HF_API_TOKEN in the .env file.",
+        "Please try again in a few moments, or check your GROQ_API_KEY/HF_API_TOKEN in the .env file.",
         "none",
     )
 

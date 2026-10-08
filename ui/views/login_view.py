@@ -1,18 +1,10 @@
 """
-Login / Signup View
-=====================
-Two-panel auth screen inspired by the provided UI mockup:
-
-LEFT panel (coloured)  ←→ RIGHT panel (form)
-Toggles between "Sign In" and "Sign Up" modes.
-
-Sign In flow:
-  1. Email + Password  → click SIGN IN
-     - If admin credentials → redirect to admin portal
-     - If student → OTP sent to email → enter OTP → VERIFY → logged in
-
-Sign Up flow:
-  Name + Email + Password → click SIGN UP → account created → switch to Sign In
+Login / Signup View (Editorial Publication Aesthetic)
+=====================================================
+Asymmetric authentication gateway:
+- Charcoal Ink Editorial Panel (Curriculum intelligence credentials & metadata)
+- Bone Paper Form Area with High Typographic Contrast
+- Strict Monospace OTP Inputs with Weighted Spring Transitions
 """
 
 import requests
@@ -20,56 +12,84 @@ import streamlit as st
 
 
 def render():
-    # -------- Premium CSS for the two-panel card --------
     st.markdown("""
     <style>
-        /* Hide Streamlit header / footer for a clean login page */
-        header[data-testid="stHeader"] {visibility: hidden;}
-        .block-container {padding-top: 1.5rem !important;}
+        header[data-testid="stHeader"] { visibility: hidden; }
+        .block-container { padding-top: 2rem !important; max-width: 980px !important; }
 
-        /* Hero card wrapper */
-        .auth-card {
-            max-width: 820px;
-            margin: 20px auto;
-            border-radius: 24px;
+        .auth-docket-wrapper {
+            background: #FFFFFF;
+            border: 1px solid #D8D1C5;
+            border-radius: 6px;
             overflow: hidden;
-            box-shadow: 0 25px 80px rgba(102, 126, 234, 0.20), 0 8px 20px rgba(0,0,0,0.08);
-            border: 1px solid rgba(255,255,255,0.35);
+            box-shadow: 0 4px 20px rgba(20, 20, 19, 0.05);
+            margin: 1.5rem auto 2rem auto;
+            animation: editorialFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        /* Side panel (welcome / hello) */
-        .auth-side {
-            background: linear-gradient(145deg, #b85450 0%, #8b3a3a 100%);
-            padding: 50px 35px;
-            text-align: center;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            min-height: 360px;
-            border-radius: 24px;
-        }
-        .auth-side h2 {
-            color: #fff; font-size: 2em; font-weight: 700;
-            margin-bottom: 12px;
-        }
-        .auth-side p {
-            color: rgba(255,255,255,0.82); font-size: 0.95em; margin-bottom: 22px;
+        .auth-editorial-panel {
+            background-color: #141413;
+            color: #F5F2EC;
+            padding: 3rem 2.2rem;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border-right: 1px solid #2A2A28;
         }
 
-        /* Form area heading */
-        .form-heading {
-            text-align: center; font-size: 1.75em; font-weight: 700;
-            margin-bottom: 18px; color: #1a1a2e;
+        .auth-editorial-panel h2 {
+            font-family: 'Instrument Serif', Georgia, serif !important;
+            font-size: 2.35rem !important;
+            color: #F5F2EC !important;
+            line-height: 1.15 !important;
+            margin: 1rem 0 0.8rem 0 !important;
+            font-weight: 400 !important;
         }
 
-        /* OTP large-letter input */
+        .auth-editorial-panel p {
+            color: #A8A49C !important;
+            font-size: 0.92rem !important;
+            line-height: 1.65 !important;
+        }
+
+        .auth-form-panel {
+            background-color: #FFFFFF;
+            padding: 2.5rem 2.5rem;
+        }
+
+        .auth-header-label {
+            font-family: 'Instrument Serif', Georgia, serif;
+            font-size: 2.1rem;
+            color: #141413;
+            margin-bottom: 0.3rem;
+            font-weight: 400;
+        }
+
+        .auth-sub-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: #8A8780;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 1.5rem;
+        }
+
         .otp-input input {
-            font-size: 24px !important; letter-spacing: 8px !important;
-            text-align: center !important; font-weight: bold !important;
+            font-family: 'JetBrains Mono', monospace !important;
+            font-size: 24px !important;
+            letter-spacing: 12px !important;
+            text-align: center !important;
+            font-weight: 600 !important;
+            color: #141413 !important;
+            border: 2px solid #D8D1C5 !important;
+            background-color: #F5F2EC !important;
+            border-radius: 4px !important;
         }
 
-        /* Section divider */
-        .auth-divider {
-            border: 0; border-top: 1px solid #e0e0e0; margin: 18px 0;
+        .otp-input input:focus {
+            border-color: #D9381E !important;
+            box-shadow: 0 0 0 3px rgba(217, 56, 30, 0.12) !important;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -88,27 +108,50 @@ def render():
     #  SIGN UP MODE
     # ================================================================
     if st.session_state.auth_mode == "signup":
-        left_col, right_col = st.columns([5, 5], gap="small")
+        col_side, col_form = st.columns([5, 6], gap="large")
 
-        # ---- Right panel: Signup form ----
-        with left_col:
-            st.markdown('<p class="form-heading">Create Account</p>', unsafe_allow_html=True)
+        with col_side:
+            st.markdown(
+                """
+                <div class="auth-editorial-panel" style="border-radius: 6px;">
+                    <div>
+                        <span class="editorial-tag" style="background: rgba(255,255,255,0.1); color: #F5F2EC;">REGISTRATION // NEW CANDIDATE</span>
+                        <h2>Join the Academic Copilot Program</h2>
+                        <p>
+                            Create an institutional account to gain access to RAG-grounded syllabus tutoring,
+                            resume skill-gap diagnostics, and timed technical viva simulations.
+                        </p>
+                    </div>
+                    <div style="border-top: 1px solid rgba(255,255,255,0.12); padding-top: 1.2rem; margin-top: 2rem;">
+                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #8A8780; letter-spacing: 0.05em;">
+                            INSTITUTION: IET JK LUXMIPAT UNIVERSITY<br>
+                            SECURITY: SECURE HASHED PERSISTENCE
+                        </div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with col_form:
+            st.markdown('<div class="auth-header-label">Candidate Registration</div>', unsafe_allow_html=True)
+            st.markdown('<div class="auth-sub-label">ENTER CREDENTIALS TO PROVISION PROFILE</div>', unsafe_allow_html=True)
 
             with st.form("signup_form"):
-                name = st.text_input("👤 Name", placeholder="Full Name", key="su_name")
-                email = st.text_input("📧 Email", placeholder="you@example.com", key="su_email")
-                password = st.text_input("🔒 Password", type="password", placeholder="••••••••", key="su_pass")
-                signup_btn = st.form_submit_button("SIGN UP", type="primary", use_container_width=True)
+                name = st.text_input("Full Name", placeholder="e.g. Nakul Ranka", key="su_name")
+                email = st.text_input("Institutional Email", placeholder="e.g. nakul@jklu.edu.in", key="su_email")
+                password = st.text_input("Access Password", type="password", placeholder="••••••••", key="su_pass")
+                signup_btn = st.form_submit_button("CREATE ACCOUNT →", type="primary", use_container_width=True)
 
             if signup_btn:
                 if not name.strip():
                     st.error("Name is required.")
                 elif not email or "@" not in email:
-                    st.error("Enter a valid email address.")
+                    st.error("Enter a valid institutional email address.")
                 elif len(password) < 4:
                     st.error("Password must be at least 4 characters.")
                 else:
-                    with st.spinner("Creating account…"):
+                    with st.spinner("Provisioning profile…"):
                         try:
                             resp = requests.post(
                                 f"{api_base}/api/v1/auth/signup",
@@ -116,7 +159,7 @@ def render():
                                 timeout=15,
                             )
                             if resp.status_code == 200:
-                                st.success("✅ " + resp.json().get("message", "Account created!"))
+                                st.success("✅ Profile provisioned successfully. Please authenticate.")
                                 st.session_state.auth_mode = "signin"
                                 st.session_state.otp_step = False
                                 st.rerun()
@@ -124,22 +167,13 @@ def render():
                                 st.error(f"❌ {resp.json().get('detail', 'Signup failed')}")
                         except requests.ConnectionError:
                             st.error(
-                                "❌ Cannot connect to the API server. "
-                                "Make sure the backend is running:\n"
-                                "```\npython -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000 --reload\n```"
+                                "❌ Backend service unreachable. Ensure FastAPI server is active at 127.0.0.1:8000."
                             )
                         except Exception as e:
                             st.error(f"Error: {str(e)}")
 
-        # ---- Left panel: Welcome banner ----
-        with right_col:
-            st.markdown("""
-            <div class="auth-side">
-                <h2>Welcome User!</h2>
-                <p>If you already have an account</p>
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button("SIGN IN", key="go_signin", use_container_width=True, type="secondary"):
+            st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
+            if st.button("ALREADY REGISTERED? SIGN IN", key="go_signin", use_container_width=True, type="secondary"):
                 st.session_state.auth_mode = "signin"
                 st.session_state.otp_step = False
                 st.rerun()
@@ -148,26 +182,51 @@ def render():
     #  SIGN IN MODE
     # ================================================================
     else:
-        left_col, right_col = st.columns([5, 5], gap="small")
+        col_side, col_form = st.columns([5, 6], gap="large")
 
-        # ---- Left panel: Sign-in form ----
-        with left_col:
-            st.markdown('<p class="form-heading">Sign In</p>', unsafe_allow_html=True)
+        with col_side:
+            st.markdown(
+                """
+                <div class="auth-editorial-panel" style="border-radius: 6px;">
+                    <div>
+                        <span class="editorial-tag" style="background: rgba(255,255,255,0.1); color: #F5F2EC;">VERIFICATION // DESK</span>
+                        <h2>Welcome to Academic Copilot</h2>
+                        <p>
+                            An end-to-end preparation engine coupling dense semantic search with
+                            supervised machine learning to pinpoint topic-level deficiencies and prescribe
+                            curriculum remediation.
+                        </p>
+                    </div>
+                    <div style="border-top: 1px solid rgba(255,255,255,0.12); padding-top: 1.2rem; margin-top: 2rem;">
+                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #8A8780; letter-spacing: 0.05em; line-height: 1.5;">
+                            STATUS: ACTIVE DEPLOYMENT<br>
+                            LLM PROVIDER: GROQ FAST INFERENCE<br>
+                            ENGINE: MISTRAL / LLAMA 3.1
+                        </div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
+        with col_form:
             # -- Step 1: Email + Password --
             if not st.session_state.otp_step:
+                st.markdown('<div class="auth-header-label">Sign In</div>', unsafe_allow_html=True)
+                st.markdown('<div class="auth-sub-label">ENTER CREDENTIALS FOR ONE-TIME PASSCODE</div>', unsafe_allow_html=True)
+
                 with st.form("signin_form"):
-                    email = st.text_input("📧 Email", placeholder="you@example.com", key="si_email")
-                    password = st.text_input("🔒 Password", type="password", placeholder="••••••••", key="si_pass")
-                    signin_btn = st.form_submit_button("SIGN IN", type="primary", use_container_width=True)
+                    email = st.text_input("Email Address", placeholder="e.g. nakul@jklu.edu.in", key="si_email")
+                    password = st.text_input("Password", type="password", placeholder="••••••••", key="si_pass")
+                    signin_btn = st.form_submit_button("AUTHENTICATE →", type="primary", use_container_width=True)
 
                 if signin_btn:
                     if not email or "@" not in email:
-                        st.error("Enter a valid email address.")
+                        st.error("Enter a valid institutional email.")
                     elif not password:
-                        st.error("Enter your password.")
+                        st.error("Password cannot be blank.")
                     else:
-                        with st.spinner("Signing in…"):
+                        with st.spinner("Validating credentials…"):
                             try:
                                 resp = requests.post(
                                     f"{api_base}/api/v1/auth/signin",
@@ -177,51 +236,65 @@ def render():
                                 if resp.status_code == 200:
                                     data = resp.json()
                                     if data.get("is_admin"):
-                                        # Admin → go directly to admin portal
                                         st.session_state.admin_token = data["admin_token"]
                                         st.session_state.admin_mode = True
-                                        st.success("✅ Admin login successful!")
+                                        st.success("✅ Admin session authenticated.")
                                         st.rerun()
                                     else:
-                                        # Student → OTP sent, show OTP entry
                                         st.session_state.signin_email = email.strip().lower()
                                         st.session_state.otp_step = True
-                                        st.success(f"✅ {data.get('message', 'OTP sent!')}")
+                                        st.success(f"✅ {data.get('message', 'OTP dispatched.')}")
                                         st.rerun()
                                 else:
-                                    st.error(f"❌ {resp.json().get('detail', 'Login failed')}")
+                                    st.error(f"❌ {resp.json().get('detail', 'Authentication failed')}")
                             except requests.ConnectionError:
-                                st.error(
-                                    "❌ Cannot connect to the API server. "
-                                    "Make sure the backend is running:\n"
-                                    "```\npython -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000 --reload\n```"
-                                )
+                                st.error("❌ Connection refused. Ensure FastAPI backend is active.")
                             except Exception as e:
                                 st.error(f"Error: {str(e)}")
 
+                st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
+                if st.button("NEW CANDIDATE? REGISTER HERE", key="go_signup", use_container_width=True, type="secondary"):
+                    st.session_state.auth_mode = "signup"
+                    st.session_state.otp_step = False
+                    st.rerun()
+
             # -- Step 2: OTP verification --
             else:
-                st.info(f"📧 OTP sent to **{st.session_state.signin_email}**")
-                st.caption("Check your **email inbox** (or server console if using console mode).")
+                st.markdown('<div class="auth-header-label">Enter One-Time Passcode</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="auth-sub-label">PASSCODE DISPATCHED TO {st.session_state.signin_email}</div>',
+                    unsafe_allow_html=True,
+                )
+
+                st.markdown(
+                    """
+                    <div style="background: var(--bg-paper); border: 1px solid var(--border-subtle); padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1.2rem;">
+                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--ink-charcoal);">
+                            NOTE: Check your email inbox or backend console (OTP_MODE=console).
+                        </span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
                 with st.form("otp_form"):
                     otp = st.text_input(
-                        "🔐 Enter 6-digit OTP",
+                        "6-Digit Code",
                         max_chars=6,
-                        placeholder="______",
+                        placeholder="000000",
                         key="otp_input",
                     )
-                    col_a, col_b = st.columns([2, 1])
+                    col_a, col_b = st.columns([3, 2])
                     with col_a:
-                        verify_btn = st.form_submit_button("VERIFY & LOGIN ✅", type="primary", use_container_width=True)
+                        verify_btn = st.form_submit_button("VERIFY & ENTER →", type="primary", use_container_width=True)
                     with col_b:
-                        resend_btn = st.form_submit_button("Resend OTP", use_container_width=True)
+                        resend_btn = st.form_submit_button("RESEND CODE", use_container_width=True)
 
                 if verify_btn:
                     if not otp or len(otp) != 6:
-                        st.error("Enter the full 6-digit OTP.")
+                        st.error("Please enter the complete 6-digit passcode.")
                     else:
-                        with st.spinner("Verifying…"):
+                        with st.spinner("Authorizing session…"):
                             try:
                                 resp = requests.post(
                                     f"{api_base}/api/v1/auth/verify-otp",
@@ -234,12 +307,12 @@ def render():
                                     st.session_state.user_email = data["email"]
                                     st.session_state.otp_step = False
                                     st.session_state.auth_mode = "signin"
-                                    st.success("✅ Login successful!")
+                                    st.success("✅ Session verified. Welcome.")
                                     st.rerun()
                                 else:
-                                    st.error(f"❌ {resp.json().get('detail', 'Verification failed')}")
+                                    st.error(f"❌ {resp.json().get('detail', 'Verification code invalid')}")
                             except requests.ConnectionError:
-                                st.error("Cannot connect to the API server.")
+                                st.error("❌ Connection failed.")
                             except Exception as e:
                                 st.error(f"Error: {str(e)}")
 
@@ -251,25 +324,13 @@ def render():
                             timeout=15,
                         )
                         if resp.status_code == 200:
-                            st.success("New OTP sent! Check your inbox / console.")
+                            st.success("New passcode generated. Check your inbox or terminal console.")
                         else:
-                            st.error("Failed to resend OTP.")
+                            st.error("Failed to generate new passcode.")
                     except Exception:
-                        st.error("Cannot connect to server.")
+                        st.error("Connection failed.")
 
-                if st.button("← Change Email", key="back_email"):
+                st.markdown("<div style='margin-top: 0.5rem;'></div>", unsafe_allow_html=True)
+                if st.button("← RETURN TO EMAIL ENTRY", key="back_email", type="secondary"):
                     st.session_state.otp_step = False
                     st.rerun()
-
-        # ---- Right panel: Hello banner ----
-        with right_col:
-            st.markdown("""
-            <div class="auth-side">
-                <h2>Hello, User!</h2>
-                <p>If you don't have an account</p>
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button("SIGN UP", key="go_signup", use_container_width=True, type="secondary"):
-                st.session_state.auth_mode = "signup"
-                st.session_state.otp_step = False
-                st.rerun()

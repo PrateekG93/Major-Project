@@ -11,6 +11,7 @@ Multi-page navigation with sidebar across views:
 """
 
 import streamlit as st
+from ui.theme import apply_theme
 
 # Page config must be the first Streamlit command
 st.set_page_config(
@@ -20,55 +21,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Custom CSS for premium styling
-st.markdown("""
-<style>
-    /* Global styles */
-    .main .block-container {
-        padding-top: 2rem;
-        max-width: 1200px;
-    }
-
-    /* Sidebar styling */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-    }
-    [data-testid="stSidebar"] .stMarkdown h1,
-    [data-testid="stSidebar"] .stMarkdown h2,
-    [data-testid="stSidebar"] .stMarkdown h3,
-    [data-testid="stSidebar"] .stMarkdown p,
-    [data-testid="stSidebar"] .stMarkdown li {
-        color: #e0e0e0;
-    }
-
-    /* Card-like containers */
-    .stExpander {
-        border: 1px solid #e0e0e0;
-        border-radius: 10px;
-    }
-
-    /* Status badges */
-    .status-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.85em;
-        font-weight: 600;
-    }
-    .badge-success { background-color: #d4edda; color: #155724; }
-    .badge-warning { background-color: #fff3cd; color: #856404; }
-    .badge-danger { background-color: #f8d7da; color: #721c24; }
-    .badge-info { background-color: #d1ecf1; color: #0c5460; }
-
-    /* Metric cards */
-    [data-testid="stMetric"] {
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 10px;
-        padding: 15px;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Apply global editorial theme & typography
+apply_theme()
 
 # Initialize session state
 if "session_token" not in st.session_state:
@@ -93,70 +47,129 @@ is_student = bool(st.session_state.session_token) and not is_admin
 is_logged_out = not is_admin and not is_student
 
 # -------------------------------------------------------------------
-#  Sidebar
+#  Sidebar (Editorial Masthead & Precision Navigation)
 # -------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("# 🎓 Academic Copilot")
-    st.markdown("---")
+    st.markdown(
+        """
+        <div style="padding-bottom: 0.8rem; border-bottom: 1px solid var(--border-subtle); margin-bottom: 1rem;">
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; color: var(--accent-red); text-transform: uppercase;">
+                PR1107 // EDITION 2026
+            </div>
+            <div style="font-family: var(--font-serif); font-size: 1.85rem; color: var(--ink-charcoal); line-height: 1.1; margin: 0.2rem 0;">
+                Academic Copilot
+            </div>
+            <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-tertiary);">
+                RAG + Supervised Intelligence
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if is_admin:
         # ---------- Admin sidebar ----------
-        st.markdown("### 🛡️ Admin Portal")
-        st.caption("Managing course materials, users & MCQ data.")
-        if st.button("🚪 Admin Logout", key="admin_logout_btn", use_container_width=True):
+        st.markdown(
+            """
+            <div style="margin-bottom: 0.8rem;">
+                <span class="editorial-tag">ACCESS // ROOT ADMIN</span>
+                <div style="font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink-muted); margin-top: 4px;">
+                    Curatorial Management
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("🚪 Log Out Admin", key="admin_logout_btn", use_container_width=True):
             st.session_state.admin_mode = False
             st.session_state.admin_token = None
             st.rerun()
 
     elif is_student:
         # ---------- Student sidebar ----------
-        st.markdown(f"👤 **{st.session_state.user_email}**")
-        if st.button("🚪 Logout", key="student_logout_btn", use_container_width=True):
+        st.markdown(
+            f"""
+            <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); padding: 0.75rem 0.9rem; border-radius: 4px; margin-bottom: 1rem;">
+                <div style="font-family: var(--font-mono); font-size: 0.65rem; color: var(--ink-tertiary); text-transform: uppercase; letter-spacing: 0.08em;">
+                    AUTHENTICATED CANDIDATE
+                </div>
+                <div style="font-family: var(--font-sans); font-size: 0.86rem; font-weight: 600; color: var(--ink-charcoal); margin-top: 2px; word-break: break-all;">
+                    {st.session_state.user_email}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            """<div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--ink-tertiary); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem;">
+                SECTIONS
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+        # Student Navigation buttons
+        pages = {
+            "upload": ("01", "Upload Dossier"),
+            "chat": ("02", "Curriculum Q&A"),
+            "interview": ("03", "Mock Interview"),
+            "dashboard": ("04", "Diagnostics"),
+        }
+
+        for page_key, (num, label) in pages.items():
+            is_active = st.session_state.current_page == page_key
+            if st.button(
+                f"{num} — {label}",
+                key=f"nav_{page_key}",
+                use_container_width=True,
+                type="primary" if is_active else "secondary",
+            ):
+                st.session_state.current_page = page_key
+                st.rerun()
+
+        st.markdown("<div style='margin-top: 0.5rem;'></div>", unsafe_allow_html=True)
+        if st.button("Log Out", key="student_logout_btn", use_container_width=True):
             st.session_state.session_token = None
             st.session_state.user_email = None
             st.session_state.otp_step = False
             st.session_state.auth_mode = "signin"
             st.rerun()
 
-        st.markdown("---")
-
-        # Student Navigation buttons
-        pages = {
-            "upload": ("📄", "Upload Documents"),
-            "chat": ("💬", "Academic Q&A"),
-            "interview": ("🎯", "Mock Interview"),
-            "dashboard": ("📊", "Performance Dashboard"),
-        }
-
-        for page_key, (icon, label) in pages.items():
-            if st.button(
-                f"{icon}  {label}",
-                key=f"nav_{page_key}",
-                use_container_width=True,
-                type="primary" if st.session_state.current_page == page_key else "secondary",
-            ):
-                st.session_state.current_page = page_key
-                st.rerun()
-
     else:
         # ---------- Logged-out sidebar ----------
-        st.info("👋 Sign in or create an account to get started.")
+        st.markdown(
+            """
+            <div style="background: var(--bg-card); border: 1px dashed var(--border-subtle); padding: 0.9rem; border-radius: 4px; margin-bottom: 1rem;">
+                <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent-red); font-weight: 600; letter-spacing: 0.06em;">
+                    GATEWAY // UNVERIFIED
+                </div>
+                <div style="font-family: var(--font-sans); font-size: 0.85rem; color: var(--ink-muted); margin-top: 4px;">
+                    Authenticate to access curricular RAG and timed mock interviews.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     # Common footer
     st.markdown("---")
-    st.markdown("### ⚙️ Settings")
-    st.session_state.api_base_url = st.text_input(
-        "API Server URL",
-        value=st.session_state.api_base_url,
-        help="FastAPI backend URL (default: http://127.0.0.1:8000)",
-    )
+    with st.expander("SERVER CONFIG", expanded=False):
+        st.session_state.api_base_url = st.text_input(
+            "API URL",
+            value=st.session_state.api_base_url,
+            help="FastAPI backend host address",
+        )
 
-    st.markdown("---")
     st.markdown(
-        "<p style='text-align:center; color:#888; font-size:0.8em;'>"
-        "Built by Nakul, Prateek & Siddharth<br>"
-        "JKLU • Major Project PR1107"
-        "</p>",
+        """
+        <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-subtle); text-align: left;">
+            <div style="font-family: var(--font-mono); font-size: 0.65rem; color: var(--ink-tertiary); letter-spacing: 0.06em; line-height: 1.5;">
+                PROJECT // PR1107<br>
+                JKLU IET • JAIPUR<br>
+                NAKUL • PRATEEK • SIDDHARTH
+            </div>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 

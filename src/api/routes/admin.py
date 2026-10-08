@@ -125,6 +125,79 @@ async def upload_material(
     }
 
 
+@router.post("/admin/upload-materials-batch")
+async def upload_materials_batch(
+    files: list[UploadFile] = File(...),
+    doc_type: str = Form("textbook"),
+    x_admin_token: Optional[str] = Header(None),
+):
+    """Upload multiple course materials (textbooks, lecture notes) at once."""
+    if not _verify_admin(x_admin_token):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    results = []
+    errors = []
+    retriever = HybridRetriever(collection_name=ADMIN_COLLECTION)
+
+    for file in files:
+        ext = os.path.splitext(file.filename)[1].lower()
+        if ext not in SUPPORTED_FORMATS:
+            errors.append({"filename": file.filename, "error": f"Unsupported format '{ext}'. Supported: {SUPPORTED_FORMATS}"})
+            continue
+
+        doc_id = f"adm_{uuid.uuid4().hex[:6]}"
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        file_path = os.path.join(UPLOAD_DIR, f"{doc_id}_{file.filename}")
+
+        try:
+            with open(file_path, "wb") as f:
+                content = await file.read()
+                f.write(content)
+        except Exception as e:
+            errors.append({"filename": file.filename, "error": f"Failed to save: {str(e)}"})
+            continue
+
+        try:
+            document = parse_document(file_path, doc_type=doc_type)
+        except Exception as e:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            errors.append({"filename": file.filename, "error": f"Failed to parse: {str(e)}"})
+            continue
+
+        if not document.pages:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            errors.append({"filename": file.filename, "error": "Document is empty."})
+            continue
+
+        chunks = chunk_document(document, doc_type=doc_type)
+        if not chunks:
+            errors.append({"filename": file.filename, "error": "No text chunks extracted."})
+            continue
+
+        try:
+            num_indexed = retriever.add_documents(chunks)
+            save_admin_material(doc_id, file.filename, doc_type, num_indexed)
+            results.append({
+                "doc_id": doc_id,
+                "filename": file.filename,
+                "chunks_indexed": num_indexed,
+            })
+        except Exception as e:
+            errors.append({"filename": file.filename, "error": f"Indexing failed: {str(e)}"})
+
+    return {
+        "status": "success",
+        "total_files": len(files),
+        "successful": len(results),
+        "failed": len(errors),
+        "results": results,
+        "errors": errors,
+        "total_chunks_indexed": sum(r["chunks_indexed"] for r in results),
+    }
+
+
 @router.get("/admin/materials")
 async def list_materials(x_admin_token: Optional[str] = Header(None)):
     """List all admin-uploaded course materials."""
