@@ -1,0 +1,55 @@
+services:
+  # ─────────────────────────────────────────────
+  # 1. FastAPI Backend
+  # ─────────────────────────────────────────────
+  - type: web
+    name: copilot-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.2
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CHROMA_PERSIST_DIR
+        value: /tmp/chroma
+      - key: SQLITE_DB_PATH
+        value: /tmp/copilot_app.db
+      - key: SCORING_MODEL_PATH
+        value: ./models/scoring_model.joblib
+      - key: QUESTION_BANK_PATH
+        value: ./data/question_bank/questions.json
+      - key: OTP_MODE
+        value: console
+      # Secrets — set these manually in the Render dashboard
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HF_API_TOKEN
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+  # ─────────────────────────────────────────────
+  # 2. Streamlit Frontend
+  # ─────────────────────────────────────────────
+  - type: web
+    name: copilot-ui
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run ui/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.2
+      # Update this to your copilot-api Render URL after first deploy
+      - key: API_BASE_URL
+        value: https://copilot-api.onrender.com

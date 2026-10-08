@@ -10,6 +10,8 @@ Multi-page navigation with sidebar across views:
 - Admin Portal (via admin credentials on login screen)
 """
 
+import os
+
 import streamlit as st
 from ui.theme import apply_theme
 
@@ -32,7 +34,7 @@ if "user_email" not in st.session_state:
 if "current_page" not in st.session_state:
     st.session_state.current_page = "upload"
 if "api_base_url" not in st.session_state:
-    st.session_state.api_base_url = "http://127.0.0.1:8000"
+    st.session_state.api_base_url = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 if "admin_mode" not in st.session_state:
     st.session_state.admin_mode = False
 if "admin_token" not in st.session_state:
