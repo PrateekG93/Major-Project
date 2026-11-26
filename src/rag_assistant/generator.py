@@ -4,7 +4,7 @@ LLM Response Generator
 Module 2 - RAG Assistant (Part 3)
 
 Constructs grounded prompts from retrieved context chunks and generates
-answers via the Hugging Face Serverless Inference API (free tier).
+answers via Groq / Hugging Face Serverless Inference API.
 
 Supports automatic fallback between primary and backup models.
 """
@@ -20,6 +20,13 @@ from src.utils.logger import get_logger
 load_dotenv()
 logger = get_logger(__name__)
 
+# LLM Provider & Credentials
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq").lower()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_PRIMARY_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+GROQ_FALLBACK_MODEL = os.getenv("GROQ_FALLBACK_MODEL", "openai/gpt-oss-20b")
+
+# Hugging Face Settings (Secondary Fallback)
 HF_API_TOKEN = os.getenv("HF_API_TOKEN", "")
 PRIMARY_MODEL = os.getenv("PRIMARY_LLM_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
 FALLBACK_MODEL = os.getenv("FALLBACK_LLM_MODEL", "HuggingFaceH4/zephyr-7b-beta")
@@ -34,13 +41,6 @@ RULES:
 4. Use clear, educational language suitable for engineering students.
 5. When explaining concepts, provide examples where possible.
 6. NEVER fabricate information that is not supported by the provided context."""
-
-# System prompt for interview evaluation
-INTERVIEW_SYSTEM_PROMPT = """You are a senior technical interviewer conducting a mock interview. Your role is to:
-1. Ask clear, well-structured technical questions appropriate for the candidate's target role.
-2. Evaluate answers fairly based on accuracy, completeness, and depth.
-3. Provide constructive feedback that helps the candidate improve.
-4. Adapt your follow-up questions based on the candidate's performance."""
 
 
 def _get_client(model_id: Optional[str] = None) -> InferenceClient:
@@ -106,86 +106,6 @@ Please provide a thorough, accurate answer based ONLY on the context above. Cite
     }
 
 
-def generate_interview_question(
-    role: str,
-    skills: list[str],
-    previous_qa: list[dict] = None,
-    difficulty: str = "medium",
-) -> str:
-    """
-    Generate a dynamic follow-up interview question using the LLM.
-
-    Args:
-        role: Target job role (e.g., "Machine Learning Engineer").
-        skills: List of skill topics to focus on.
-        previous_qa: List of previous Q&A pairs for context.
-        difficulty: Difficulty level ('easy', 'medium', 'hard').
-
-    Returns:
-        A question string.
-    """
-    prev_context = ""
-    if previous_qa:
-        prev_context = "\n".join(
-            f"Q: {qa.get('question', '')}\nA: {qa.get('answer', '')}"
-            for qa in previous_qa[-3:]  # Last 3 Q&A pairs for context
-        )
-
-    prompt = f"""Generate a single technical interview question for a {role} position.
-
-Skills to assess: {', '.join(skills)}
-Difficulty: {difficulty}
-{f'Previous Q&A context:{chr(10)}{prev_context}' if prev_context else ''}
-
-Requirements:
-- The question should be specific and testable
-- It should assess practical understanding, not just memorization
-- Output ONLY the question text, nothing else"""
-
-    messages = [
-        {"role": "system", "content": INTERVIEW_SYSTEM_PROMPT},
-        {"role": "user", "content": prompt},
-    ]
-
-    answer, _ = _call_llm(messages, max_tokens=256, temperature=0.7)
-    return answer.strip()
-
-
-def evaluate_answer_with_llm(
-    question: str,
-    user_answer: str,
-    reference_answer: Optional[str] = None,
-    topic: str = "",
-) -> dict:
-    """
-    Use the LLM to evaluate a candidate's answer quality.
-
-    Returns:
-        Dictionary with 'score' (0-1), 'feedback', 'strengths', 'weaknesses'.
-    """
-    ref_block = f"\nREFERENCE ANSWER: {reference_answer}" if reference_answer else ""
-
-    prompt = f"""Evaluate the following interview answer.
-
-TOPIC: {topic}
-QUESTION: {question}
-CANDIDATE'S ANSWER: {user_answer}{ref_block}
-
-Provide your evaluation in EXACTLY this format:
-SCORE: [a number between 0.0 and 1.0]
-FEEDBACK: [2-3 sentences of constructive feedback]
-STRENGTHS: [key strengths in the answer]
-WEAKNESSES: [areas for improvement]"""
-
-    messages = [
-        {"role": "system", "content": "You are an expert technical evaluator. Be fair but rigorous."},
-        {"role": "user", "content": prompt},
-    ]
-
-    response, _ = _call_llm(messages, max_tokens=512, temperature=0.2)
-    return _parse_evaluation(response)
-
-
 def _build_context_block(chunks: list[dict]) -> str:
     """Format retrieved chunks into a structured context block."""
     if not chunks:
@@ -238,13 +158,36 @@ def _call_llm(
     temperature: float = 0.3,
 ) -> tuple[str, str]:
     """
-    Call the LLM with automatic fallback.
+    Call the LLM with automatic multi-tier fallback (Groq -> HF -> graceful message).
 
     Returns:
         Tuple of (response_text, model_id_used).
     """
-    models_to_try = [PRIMARY_MODEL, FALLBACK_MODEL]
+    # 1. Try Groq if configured
+    if (LLM_PROVIDER == "groq" or GROQ_API_KEY) and GROQ_API_KEY.strip():
+        try:
+            from groq import Groq
+            client = Groq(api_key=GROQ_API_KEY.strip())
+            groq_models = [GROQ_PRIMARY_MODEL, GROQ_FALLBACK_MODEL, "qwen/qwen3.8-27b"]
+            for model_id in groq_models:
+                try:
+                    response = client.chat.completions.create(
+                        messages=messages,
+                        model=model_id,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                    )
+                    answer = response.choices[0].message.content
+                    logger.info(f"LLM response generated using Groq model {model_id}")
+                    return answer, f"groq:{model_id}"
+                except Exception as e:
+                    logger.warning(f"Groq model call failed for {model_id}: {e}")
+                    continue
+        except Exception as e:
+            logger.warning(f"Groq initialization/execution failed: {e}")
 
+    # 2. Try Hugging Face fallback
+    models_to_try = [PRIMARY_MODEL, FALLBACK_MODEL]
     for model_id in models_to_try:
         try:
             client = _get_client(model_id)
@@ -254,49 +197,18 @@ def _call_llm(
                 temperature=temperature,
             )
             answer = response.choices[0].message.content
-            logger.info(f"LLM response generated using {model_id}")
-            return answer, model_id
+            logger.info(f"LLM response generated using Hugging Face model {model_id}")
+            return answer, f"hf:{model_id}"
 
         except Exception as e:
-            logger.warning(f"LLM call failed for {model_id}: {e}")
+            logger.warning(f"Hugging Face call failed for {model_id}: {e}")
             continue
 
     # If all models fail, return a graceful error message
     logger.error("All LLM models failed. Returning fallback message.")
     return (
         "I'm unable to generate a response at the moment due to API limitations. "
-        "Please try again in a few moments, or check your HF_API_TOKEN in the .env file.",
+        "Please try again in a few moments, or check your GROQ_API_KEY/HF_API_TOKEN in the .env file.",
         "none",
     )
 
-
-def _parse_evaluation(response: str) -> dict:
-    """Parse the structured evaluation response from the LLM."""
-    result = {
-        "score": 0.5,
-        "feedback": "",
-        "strengths": "",
-        "weaknesses": "",
-    }
-
-    lines = response.strip().split("\n")
-    for line in lines:
-        line_clean = line.strip()
-        if line_clean.upper().startswith("SCORE:"):
-            try:
-                score_str = line_clean.split(":", 1)[1].strip()
-                # Handle scores like "0.85" or "85%"
-                score = float(score_str.replace("%", "").strip())
-                if score > 1:
-                    score = score / 100.0
-                result["score"] = max(0.0, min(1.0, score))
-            except (ValueError, IndexError):
-                pass
-        elif line_clean.upper().startswith("FEEDBACK:"):
-            result["feedback"] = line_clean.split(":", 1)[1].strip()
-        elif line_clean.upper().startswith("STRENGTHS:"):
-            result["strengths"] = line_clean.split(":", 1)[1].strip()
-        elif line_clean.upper().startswith("WEAKNESSES:"):
-            result["weaknesses"] = line_clean.split(":", 1)[1].strip()
-
-    return result

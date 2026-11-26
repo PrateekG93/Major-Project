@@ -132,6 +132,7 @@ async def start_mcq(
             "options": first_q["options"],
             "topic": first_q.get("topic", "General"),
             "difficulty": first_q.get("difficulty", "medium"),
+            "interview_round": first_q.get("interview_round", ""),
         },
     )
 
@@ -157,6 +158,9 @@ async def submit_mcq_answer(
             raise HTTPException(status_code=404, detail="Session not found")
         cached = {"email": db_session["email"], "state": db_session["state"]}
         _mcq_sessions[request.session_id] = cached
+
+    if cached.get("email") != email:
+        raise HTTPException(status_code=403, detail="Access denied to another user's session")
 
     state = cached["state"]
     current_idx = state["current_index"]
@@ -226,6 +230,7 @@ async def submit_mcq_answer(
             "options": next_q["options"],
             "topic": next_q.get("topic", "General"),
             "difficulty": next_q.get("difficulty", "medium"),
+            "interview_round": next_q.get("interview_round", ""),
         }
 
     return MCQAnswerResponse(
@@ -252,13 +257,20 @@ async def get_mcq_result(
     session_id: str,
     x_session_token: Optional[str] = Header(None),
 ):
-    """Get full results for an MCQ session."""
+    """Get full results for an MCQ session (enforcing user ownership)."""
     if not x_session_token:
         raise HTTPException(status_code=401, detail="Authentication required")
+    email = validate_session(x_session_token)
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
 
     session = get_mcq_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    if session["email"] != email:
+        raise HTTPException(status_code=403, detail="Access denied to another user's session")
+    if session["email"] != email:
+        raise HTTPException(status_code=403, detail="Access denied to another user's session")
 
     answers = get_mcq_answers(session_id)
 
@@ -330,6 +342,63 @@ async def get_latest_result(x_session_token: Optional[str] = Header(None)):
         "score_percentage": round(session["total_correct"] / max(session["total_answered"], 1) * 100, 1),
         "topic_breakdown": topic_breakdown,
         "answers": answers,
+    }
+
+
+@router.get("/mcq/session/{session_id}")
+async def get_session_details(
+    session_id: str,
+    x_session_token: Optional[str] = Header(None),
+):
+    """Get active session details for resumption."""
+    if not x_session_token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    email = validate_session(x_session_token)
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    session = get_mcq_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session["email"] != email:
+        raise HTTPException(status_code=403, detail="Access denied to another user's session")
+
+    import json
+    state = json.loads(session["state_json"]) if isinstance(session["state_json"], str) else session["state_json"]
+    current_idx = state.get("current_index", 0)
+    questions = state.get("questions", [])
+    current_q = questions[current_idx] if current_idx < len(questions) else None
+
+    # Load recorded answers for scores
+    answers = get_mcq_answers(session_id)
+
+    formatted_q = None
+    if current_q:
+        formatted_q = {
+            "index": current_idx,
+            "question_text": current_q["question_text"],
+            "options": current_q["options"],
+            "topic": current_q.get("topic", "General"),
+            "difficulty": current_q.get("difficulty", "medium"),
+            "interview_round": current_q.get("interview_round", ""),
+        }
+
+    return {
+        "session_id": session_id,
+        "total_questions": len(questions),
+        "current_index": current_idx,
+        "is_complete": bool(session["is_complete"]),
+        "topics": state.get("topics", []),
+        "current_question": formatted_q,
+        "scores": [
+            {
+                "is_correct": a["is_correct"],
+                "correct_answer": a["correct_answer"],
+                "explanation": a.get("explanation", ""),
+                "topic": a.get("topic", ""),
+            }
+            for a in answers
+        ],
     }
 
 

@@ -53,6 +53,7 @@ data/copilot_app.db
 data/vector_store/chroma/
 data/raw_documents/*.pdf
 data/processed_chunks/*.json
+data/audio_recordings/
 
 # Keep directory structure with .gitkeep
 !data/vector_store/.gitkeep

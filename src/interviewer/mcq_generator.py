@@ -17,6 +17,7 @@ import uuid
 from typing import Optional
 
 from src.utils.logger import get_logger
+from src.utils.text_utils import strip_html_markup
 
 logger = get_logger(__name__)
 
@@ -75,7 +76,7 @@ def _generate_mcqs_via_llm(
     num_questions: int = 10,
     jd_text: str = "",
 ) -> list[dict]:
-    """Use LLM to generate MCQ questions from textbook content."""
+    """Use LLM to generate MCQ questions from textbook content and JD context."""
     try:
         from src.rag_assistant.generator import _get_client
 
@@ -138,11 +139,11 @@ Return ONLY the JSON array, no other text."""
                     and q["correct_answer"] in ("A", "B", "C", "D")
                 ):
                     valid_questions.append({
-                        "question_text": q["question_text"],
-                        "options": q["options"],
+                        "question_text": strip_html_markup(q["question_text"]),
+                        "options": [strip_html_markup(opt) for opt in q["options"]],
                         "correct_answer": q["correct_answer"],
-                        "explanation": q.get("explanation", ""),
-                        "topic": q.get("topic", topics[0] if topics else "General"),
+                        "explanation": strip_html_markup(q.get("explanation", "")),
+                        "topic": strip_html_markup(q.get("topic", topics[0] if topics else "General")),
                         "difficulty": q.get("difficulty", "medium"),
                     })
 
@@ -397,30 +398,20 @@ def generate_mcq_questions(
 ) -> list[dict]:
     """
     Generate MCQ questions based on JD, resume, and textbook content.
-
-    Args:
-        jd_text: Job description text.
-        resume_text: Resume text.
-        num_questions: Number of questions to generate.
-
-    Returns:
-        List of MCQ question dicts.
     """
-    # Step 1: Extract topics
     topics = _extract_topics_from_jd(jd_text, resume_text)
-
-    # Step 2: Get textbook context
     context_chunks = _get_textbook_context(topics)
+    questions = _generate_mcqs_via_llm(
+        topics=topics,
+        context_chunks=context_chunks,
+        num_questions=num_questions,
+        jd_text=jd_text,
+    )
 
-    # Step 3: Try LLM generation
-    questions = _generate_mcqs_via_llm(topics, context_chunks, num_questions, jd_text)
-
-    # Step 4: Fill remaining from fallback bank if needed
     if len(questions) < num_questions:
         logger.info(f"LLM generated {len(questions)} questions, filling from fallback bank")
         remaining = num_questions - len(questions)
 
-        # Filter fallback questions by matching topics
         topic_lower = {t.lower() for t in topics}
         matching_fallback = [
             q for q in FALLBACK_MCQ_BANK
@@ -428,19 +419,25 @@ def generate_mcq_questions(
             or any(t in q["topic"].lower() for t in topic_lower)
         ]
 
-        # If not enough matches, use all fallback
         if len(matching_fallback) < remaining:
             matching_fallback = FALLBACK_MCQ_BANK.copy()
 
         random.shuffle(matching_fallback)
 
-        # Avoid duplicates
         existing_texts = {q["question_text"] for q in questions}
         for fq in matching_fallback:
             if fq["question_text"] not in existing_texts and len(questions) < num_questions:
-                questions.append(fq)
+                questions.append(dict(fq))
                 existing_texts.add(fq["question_text"])
 
-    # Shuffle final questions
+    # Shuffle final questions and strip any residual HTML markup
     random.shuffle(questions)
-    return questions[:num_questions]
+    sanitized = []
+    for q in questions[:num_questions]:
+        qc = dict(q)
+        qc["question_text"] = strip_html_markup(qc.get("question_text", ""))
+        qc["options"] = [strip_html_markup(o) for o in qc.get("options", [])]
+        qc["explanation"] = strip_html_markup(qc.get("explanation", ""))
+        qc["topic"] = strip_html_markup(qc.get("topic", "General"))
+        sanitized.append(qc)
+    return sanitized

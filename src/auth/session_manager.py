@@ -54,13 +54,13 @@ def create_session(email: str) -> str:
 
 def validate_session(token: str) -> Optional[str]:
     """
-    Validate a session token.
+    Validate a session token and confirm the user is verified.
 
     Args:
         token: Session token string.
 
     Returns:
-        User email if valid, None otherwise.
+        User email if valid and verified, None otherwise.
     """
     from src.utils.checkpoint import _get_connection
 
@@ -70,7 +70,12 @@ def validate_session(token: str) -> Optional[str]:
     conn = _get_connection()
     try:
         cursor = conn.execute(
-            "SELECT email, expires_at, is_active FROM user_sessions WHERE token = ?",
+            """
+            SELECT s.email, s.expires_at, s.is_active, COALESCE(u.is_verified, 1)
+            FROM user_sessions s
+            JOIN users u ON s.email = u.email
+            WHERE s.token = ?
+            """,
             (token,),
         )
         row = cursor.fetchone()
@@ -78,10 +83,9 @@ def validate_session(token: str) -> Optional[str]:
         if not row:
             return None
 
-        email, expires_at, is_active = row
+        email, expires_at, is_active, is_verified = row
 
-        if not is_active or time.time() > expires_at:
-            # Session expired or inactive
+        if not is_active or time.time() > expires_at or not is_verified:
             conn.execute(
                 "UPDATE user_sessions SET is_active = 0 WHERE token = ?", (token,)
             )
@@ -89,6 +93,24 @@ def validate_session(token: str) -> Optional[str]:
             return None
 
         return email
+    finally:
+        conn.close()
+
+
+def invalidate_all_user_sessions(email: str) -> int:
+    """Invalidate all active sessions for a user (e.g., on password reset)."""
+    from src.utils.checkpoint import _get_connection
+
+    email = email.strip().lower()
+    conn = _get_connection()
+    try:
+        cursor = conn.execute(
+            "UPDATE user_sessions SET is_active = 0 WHERE email = ? AND is_active = 1",
+            (email,),
+        )
+        conn.commit()
+        logger.info(f"Invalidated {cursor.rowcount} session(s) for {email}")
+        return cursor.rowcount
     finally:
         conn.close()
 

@@ -59,16 +59,16 @@ An end-to-end academic and career acceleration platform combining **Retrieval-Au
 
 ### The Problem
 Preparing for academic examinations and technical job interviews presents major friction points for engineering students:
-1. **Generic Preparation**: Standard question banks and AI chatbots lack alignment with specific course syllabi, university exam patterns, and target job descriptions (JDs).
+1. **No Curricular Grounding**: Generic chatbots lack alignment with specific course syllabi, university exam patterns, and target job descriptions (JDs).
 2. **One-Way Interaction**: Current study assistants answer queries statically without assessing whether the student actually internalized the concepts or retained prerequisite knowledge.
-3. **No Closed-Loop Feedback**: Students rarely receive automated, quantitative diagnosis of their topic-level weak points (e.g., scoring 82% in Python, but failing SQL queries at 61%), nor do they receive a direct path back to relevant lecture notes to bridge that gap.
+3. **No Closed-Loop Feedback**: Students rarely receive automated, quantitative diagnosis of their topic-level weak points (e.g., scoring 82% in Python, but 61% in SQL & Databases), nor a direct path back to relevant lecture notes.
 
 ### The Proposed Solution
 The **Intelligent Academic & Career Copilot** introduces a closed-loop preparation engine:
 1. Ingests user documents (syllabi, lecture notes, exam papers, and resumes).
-2. Conducts realistic mock interviews driven by real-world interview datasets (AmbitionBox, GeeksforGeeks).
-3. Analyzes candidate responses using both semantic heuristics and trained Machine Learning models (Random Forest / XGBoost) across multiple dimensions (accuracy, response latency, conceptual depth, confidence).
-4. Generates a personalized remediation plan pointing back to specific sections within the user's uploaded notes, followed by targeted re-examination.
+2. Conducts adaptive AI audio interviews and timed MCQ mock exams backed by a curated 11-topic interview question bank.
+3. Analyzes candidate responses using Whisper speech-to-text, deterministic fluency checks, and LLM evaluation across rubric dimensions.
+4. Highlights weak sub-domains linked back to the student's uploaded course notes.
 
 ---
 
@@ -76,10 +76,9 @@ The **Intelligent Academic & Career Copilot** introduces a closed-loop preparati
 
 - 📄 **Multi-Format Document Parsing**: Native extraction of syllabi, resumes, lecture presentations, and question papers (`.pdf`, `.docx`, `.pptx`, `.txt`).
 - 🔍 **Hybrid RAG Pipeline**: Combines sparse lexical matching (**BM25**) with dense semantic vector embeddings (**Sentence-Transformers**) and a neural cross-encoder **Reranker** to minimize context noise.
-- 🎯 **Industry-Aligned Mock Interviews**: Parses student resumes alongside target Job Descriptions (e.g., Machine Learning Engineer, Backend Developer) and injects real interview questions mined from career portals.
-- 📊 **Predictive ML Skill Diagnostic**: Scikit-Learn / XGBoost models that classify competency scores, detect weak sub-domains, and predict exam/interview readiness.
-- 🔁 **Adaptive Retesting Loop**: Re-evaluates identified weak spots by dynamically generating targeted micro-quizzes referencing the student's own curriculum.
-- 🛡️ **Reliability & Hallucination Guard**: Automated groundedness checking (TruLens/RAGAS) and checkpointing to preserve session states during dropouts.
+- 🎯 **Dossier-Calibrated Mock Interviews**: Parses student resumes alongside target Job Descriptions (extracting role, organization, and skill gaps) to drive Audio and MCQ mock interviews.
+- 📊 **ATS & Topic Diagnostics**: Evaluates resume-to-JD ATS compatibility, MCQ topic proficiency, and audio interview performance charts.
+- 🛡️ **Reliability & Hallucination Guard**: Automated groundedness checking (TruLens/RAGAS) and stateful SQLite session recovery.
 
 ---
 
@@ -113,7 +112,7 @@ flowchart TD
     subgraph Storage_Layer ["Data & Storage Layer"]
         VecDB[("Vector Database\n(ChromaDB / FAISS)\n• Personal Docs Collection\n• Shared Question Bank")]
         RelDB[("Relational Database\n(SQLite / PostgreSQL)\n• User Profiles\n• Session Checkpoints\n• Performance Scores")]
-        ScraperPipe["Knowledge Base Pipeline\n(Scraped GeeksforGeeks / AmbitionBox Questions)"]
+        ScraperPipe["Curated Question Bank\n(11 Core CS & AI/ML Topics)"]
     end
 
     subgraph Eval_Layer ["Evaluation & Quality Layer"]
@@ -202,9 +201,8 @@ sequenceDiagram
   - Parses uploaded resume and target Job Description (e.g., Machine Learning Engineer, Data Analyst, Software Engineer).
   - Performs skill-gap alignment mapping between candidate background and job prerequisites.
 - **Shared Industry Question Bank**:
-  - Integrates pre-curated and periodically scraped interview patterns from developer and career portals (AmbitionBox, GeeksforGeeks).
-  - Categorizes queries into core disciplines: Programming Languages, Data Structures & Algorithms, Machine Learning Theory, System Design, and SQL/Databases.
-  - Generates follow-up dynamic probes based on previous candidate answers.
+  - Curated, deduplicated 11-topic repository aligned to core CS/AI/ML coursework and Behavioral/HR interviews.
+  - Filters strictly by Topic, Interview Round (`Coding`, `Technical`, `HR`), and Difficulty (`easy`, `medium`, `hard`).
 
 ### Module 4: ML-Based Skill Analysis & Adaptive Learning Loop
 - **Predictive Scoring**:
@@ -271,7 +269,7 @@ Major_Project/
 ├── data/
 │   ├── raw_documents/                  # Uploaded user syllabi, notes, resumes
 │   ├── processed_chunks/               # Serialized text chunks and metadata
-│   ├── question_bank/                  # Scraped AmbitionBox & GFG interview question datasets
+│   ├── question_bank/                  # Curated 11-topic interview question bank JSON
 │   └── vector_store/                   # Persistent ChromaDB / FAISS index storage
 ├── src/
 │   ├── __init__.py
@@ -281,8 +279,10 @@ Major_Project/
 │   │   └── routes/
 │   │       ├── upload.py               # Document ingestion endpoint
 │   │       ├── ask.py                  # RAG Q&A endpoint
-│   │       ├── interview.py            # Mock interview state machine
-│   │       └── score.py                # ML scoring and recommendation endpoint
+│   │       ├── audio_interview.py      # Adaptive AI Audio Interview endpoints
+│   │       ├── mcq_interview.py        # Timed MCQ Examination endpoints
+│   │       ├── questions.py            # Question Bank endpoints
+│   │       └── score.py                # ATS resume audit endpoint
 │   ├── document_intelligence/          # Module 1: Parsing & Chunking
 │   │   ├── __init__.py
 │   │   ├── parser.py                   # PDF, DOCX, PPTX extractors
@@ -295,15 +295,17 @@ Major_Project/
 │   ├── interviewer/                    # Module 3: Interviewer & Question Bank
 │   │   ├── __init__.py
 │   │   ├── role_matcher.py             # Resume-to-JD skill extractor
-│   │   ├── question_generator.py       # Dynamic query synthesizer
-│   │   └── scraper_pipeline.py         # Question bank updater (GFG, AmbitionBox)
-│   ├── ml_scoring/                     # Module 4: Performance & Diagnostics
+│   │   ├── audio_service.py            # Whisper STT & fluency analyzer
+│   │   ├── audio_interviewer.py        # Adaptive LLM interview orchestrator
+│   │   ├── mcq_generator.py            # Timed MCQ generator
+│   │   ├── question_bank_service.py    # Question search & bookmark service
+│   │   ├── ingestion.py                # Deduplication & ingestion pipeline
+│   │   └── scraper_pipeline.py         # Question bank updater & seeder
+│   ├── ml_scoring/                     # Module 4: ATS Resume Diagnostics
 │   │   ├── __init__.py
-│   │   ├── feature_extractor.py        # Latency, accuracy, confidence metrics
-│   │   ├── model.py                    # Random Forest / XGBoost classifiers
-│   │   └── recommendation_engine.py    # Notes mapping & re-test question selector
+│   │   └── ats_scorer.py               # Resume-vs-JD ATS compatibility scoring
 │   └── utils/
-│       ├── checkpoint.py               # Session saving & fault tolerance
+│       ├── checkpoint.py               # SQLite session persistence
 │       └── logger.py                   # Structured error logging
 ├── evaluation/                         # Benchmarking & Validation
 │   ├── eval_ragas.py                   # RAGAS metrics execution
@@ -311,7 +313,9 @@ Major_Project/
 ├── tests/                              # Unit and integration test suites
 │   ├── test_parser.py
 │   ├── test_rag.py
-│   └── test_scoring.py
+│   ├── test_email_otp.py
+│   ├── test_question_bank_integration.py
+│   └── test_audio_interview_adaptive.py
 └── ui/                                 # Streamlit frontend presentation
     ├── app.py                          # Streamlit navigation entry point
     ├── views/
@@ -363,58 +367,13 @@ Major_Project/
 }
 ```
 
-### 3. Interview Session Initializer
-- **Route**: `POST /api/v1/interview/start`
-- **Payload**:
-```json
-{
-  "target_role": "Machine Learning Engineer",
-  "resume_id": "doc_resume_nakul",
-  "experience_level": "Junior / Entry-Level"
-}
-```
-- **Response**:
-```json
-{
-  "session_id": "sess_91238a",
-  "matched_skills": ["Python", "Machine Learning", "Deep Learning", "SQL", "RAG"],
-  "first_question": {
-    "question_id": "q_101",
-    "topic": "Machine Learning",
-    "prompt": "How does Ridge regression differ from Lasso regression in feature selection?"
-  }
-}
-```
+### 3. AI Audio Interview & Timed MCQ Battery
+- **Audio Routes**: `POST /api/v1/audio-interview/start`, `POST /api/v1/audio-interview/{id}/transcribe`, `POST /api/v1/audio-interview/{id}/submit-turn`, `POST /api/v1/audio-interview/{id}/end`
+- **MCQ Routes**: `POST /api/v1/mcq/start`, `POST /api/v1/mcq/answer`, `GET /api/v1/mcq/latest`
 
-### 4. Answer Evaluation & Skill Analysis
-- **Route**: `POST /api/v1/score`
-- **Payload**:
-```json
-{
-  "session_id": "sess_91238a",
-  "question_id": "q_101",
-  "user_answer": "Lasso uses L1 penalty which zeroes out weights, while Ridge uses L2 penalty.",
-  "response_time_seconds": 24.5
-}
-```
-- **Response**:
-```json
-{
-  "score": 0.85,
-  "topic_breakdown": {
-    "Python": 82.0,
-    "Machine Learning": 74.0,
-    "SQL": 61.0
-  },
-  "detected_weaknesses": ["SQL Subqueries and Window Functions"],
-  "recommended_materials": [
-    {
-      "source_doc": "DBMS_Lecture_Notes_Unit4.pdf",
-      "recommended_sections": ["Window Functions: RANK and DENSE_RANK"]
-    }
-  ]
-}
-```
+### 4. ATS Resume Compatibility Audit
+- **Route**: `GET /api/v1/score/ats/analyze`
+- Evaluates keyword coverage, resume sections, action verbs, and quantified impact against the uploaded job description.
 
 ---
 
@@ -452,41 +411,84 @@ Major_Project/
    ```
 
 ### Environment Variables Configuration (`.env`)
-Create a `.env` file in the root directory:
+Copy `.env.example` to `.env` and configure the following sections:
 ```ini
 # Core Configuration
 ENVIRONMENT=development
 DEBUG=True
 LOG_LEVEL=INFO
 
-# Model & LLM Settings
-LLM_PROVIDER=huggingface          # Options: 'huggingface', 'ollama', 'openai'
+# LLM & Speech-to-Text (Groq + Hugging Face Fallback)
+LLM_PROVIDER=groq
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL=openai/gpt-oss-120b
+GROQ_FALLBACK_MODEL=openai/gpt-oss-20b
+STT_MODEL=whisper-large-v3-turbo
 HF_API_TOKEN=your_huggingface_token_here
-PRIMARY_LLM_MODEL=mistralai/Mistral-7B-Instruct-v0.2
 EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 
-# Storage & Vector DB Paths
-VECTOR_DB_TYPE=chromadb           # Options: 'chromadb', 'faiss'
+# Storage & Audio Retention
 CHROMA_PERSIST_DIR=./data/vector_store/chroma
 SQLITE_DB_PATH=./data/copilot_app.db
+AUDIO_STORAGE_DIR=./data/audio_recordings
+AUDIO_RETENTION_HOURS=24
 
-# Evaluation Settings
-ENABLE_RAGAS_EVAL=True
+# Email OTP Security & SMTP
+OTP_MODE=email                          # Use 'console' for local dev without SMTP
+OTP_HMAC_SECRET=change_this_secret
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your_email@gmail.com
+SMTP_PASSWORD=your_16_char_app_password
+SMTP_FROM_EMAIL=your_email@gmail.com
+SMTP_FROM_NAME=Academic & Career Copilot
+
+# Question Sources
+SCRAPE_ENABLED=True
+SCRAPE_RATE_LIMIT_SECONDS=3
 ```
+
+### Email SMTP Configuration (Gmail / Transactional SMTP)
+1. Enable **2-Step Verification** on your Google account.
+2. Generate a 16-character **App Password** at `https://myaccount.google.com/apppasswords`.
+3. Set `OTP_MODE=email`, `SMTP_USERNAME`, `SMTP_PASSWORD` (the App Password), and `SMTP_FROM_EMAIL` in `.env`.
+4. For local development without an SMTP server, set `OTP_MODE=console` to view verification codes in the FastAPI server terminal.
 
 ### Running the Applications
 
 1. **Start the FastAPI Backend Service**:
    ```bash
-   uvicorn src.api.main:app --host 127.0.0.1 --port 8000 --reload
+   python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000 --reload
    ```
    *Swagger API Documentation will be accessible at: `http://127.0.0.1:8000/docs`*
 
 2. **Start the Streamlit User Interface**:
    ```bash
-   streamlit run ui/app.py
+   python -m streamlit run ui/app.py
    ```
    *Frontend UI will open automatically at: `http://localhost:8501`*
+
+### New Integrated Modules & API Endpoints
+
+- **Secure Email OTP Authentication (`/api/v1/auth/*`)**:
+  - `POST /api/v1/auth/signup`, `POST /api/v1/auth/verify-signup`, `POST /api/v1/auth/signin`, `POST /api/v1/auth/request-otp`, `POST /api/v1/auth/verify-otp`, `POST /api/v1/auth/forgot-password`, `POST /api/v1/auth/verify-reset-otp`, `POST /api/v1/auth/reset-password`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`.
+- **Centralized Multi-Topic Question Bank (`/api/v1/questions/*` & `/api/v1/scraping/*`)**:
+  - Built via `scripts/build_question_bank.py` (`OpenDatasetsSource`, 5-level exact/lexical/semantic deduplication, 11 fixed topics aligned to `project.tex`).
+  - Endpoints: `GET /api/v1/questions/search`, `GET /api/v1/questions/topics`, `GET /api/v1/questions/filters`, `POST/DELETE /api/v1/questions/{id}/bookmark`, `GET /api/v1/questions/bookmarks`, `GET /api/v1/questions/duplicates`, `POST /api/v1/questions/import`, `POST /api/v1/scraping/seed`.
+- **Adaptive AI Audio Interview (`/api/v1/audio-interview/*`)**:
+  - Built on the BeFluent foundation (`whisper-large-v3-turbo` STT, deterministic fluency metrics, Pydantic-validated Groq LLM adaptive evaluator & follow-up orchestrator).
+  - Endpoints: `POST /api/v1/audio-interview/start`, `POST /api/v1/audio-interview/{id}/transcribe`, `POST /api/v1/audio-interview/{id}/submit-turn`, `POST /api/v1/audio-interview/{id}/submit-audio`, `GET /api/v1/audio-interview/{id}`, `POST /api/v1/audio-interview/{id}/end`, `GET /api/v1/audio-interview/{id}/report`, `GET /api/v1/audio-interview/{id}/audio/{turn}`, `GET /api/v1/audio-interview/history`.
+
+### Running Tests
+```bash
+python -m pytest tests -v
+```
+
+### Deployment Instructions
+1. Provision Python 3.10+ runtime with `pip install -r requirements.txt`.
+2. Configure production `.env` secrets (`GROQ_API_KEY`, `OTP_HMAC_SECRET`, SMTP credentials, `ADMIN_PASSWORD`).
+3. Ensure `./data/` is mounted on persistent disk so SQLite (`copilot_app.db`), ChromaDB (`vector_store/`), and retained audio recordings persist across restarts.
+4. Run FastAPI behind a reverse proxy (HTTPS required in production for browser `MediaRecorder` / microphone access!) and start Streamlit pointing `API URL` to the backend.
 
 ---
 
@@ -495,10 +497,10 @@ ENABLE_RAGAS_EVAL=True
 | Timeline | Phase | Deliverables / Status |
 | :--- | :--- | :--- |
 | **Week 1** *(8 Sep 2026)* | **System Architecture & Data Modeling** | • Finalize 4-module split (Doc Intelligence, RAG, Interviewer, ML).<br>• Map complete user journey.<br>• Finalize hybrid storage design (Personal docs + shared question bank).<br>• Define technology stack. ✅ **Completed** |
-| **Week 2** | **Data Collection & Repository Scaffold** | • Gather sample syllabi, question papers, lecture notes, resumes.<br>• Harvest initial batch of role-skill pairs & questions from GFG/AmbitionBox.<br>• Scaffold repository directories, database schemas, and baseline dependencies. 🔄 **In Progress** |
+| **Week 2** | **Data Collection & Repository Scaffold** | • Gather sample syllabi, question papers, lecture notes, resumes.<br>• Build the curated 11-topic question bank dataset.<br>• Scaffold repository directories, database schemas, and baseline dependencies. ✅ **Completed** |
 | **Week 3 - 4** | **Document Intelligence & Hybrid RAG Engine** | • Implement multi-format document parser (`.pdf`, `.docx`, `.pptx`).<br>• Configure BM25 + ChromaDB/FAISS hybrid retriever with reranking.<br>• Integrate Mistral-7B / Llama 3 via LangChain/LlamaIndex. |
 | **Week 5 - 6** | **AI Interviewer & Shared Question Bank** | • Implement resume & Job Description skill extraction parser.<br>• Build interactive mock interview state machine.<br>• Implement session checkpointing and fallback mechanisms. |
-| **Week 7 - 8** | **ML Skill Diagnostics & Adaptive Feedback Loop** | • Train Scikit-Learn / XGBoost models on simulated candidate response metrics.<br>• Build the note-recommendation engine linking weak topics to uploaded course packs.<br>• Develop automated retesting question generator. |
+| **Week 7 - 8** | **Adaptive Audio Interview & ATS Diagnostics** | • Build BeFluent-based Whisper STT + adaptive LLM interviewer & ATS analyzer.<br>• Link weak audio/MCQ topics back to uploaded course packs for remediation. |
 | **Week 9 - 10** | **UI Assembly, Evaluation & Deployment** | • Build Streamlit multi-tab interface (Upload, Chat, Interview, Analytics Dashboard).<br>• Run RAGAS and TruLens benchmarks (Context precision, Recall, Faithfulness).<br>• Package Docker container and deploy to Hugging Face Spaces / Render. |
 
 ---

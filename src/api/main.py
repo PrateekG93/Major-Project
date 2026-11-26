@@ -36,25 +36,25 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Database init warning: {e}")
 
-    # Seed the question bank if it doesn't exist
+    # Seed the question bank if it doesn't exist in DB or JSON
     try:
         from src.interviewer.scraper_pipeline import seed_question_bank
+        from src.interviewer.ingestion import get_canonical_question_count
         question_bank_path = os.getenv("QUESTION_BANK_PATH", "./data/question_bank/questions.json")
-        if not os.path.exists(question_bank_path):
+        if get_canonical_question_count() == 0 or not os.path.exists(question_bank_path):
             seed_question_bank()
-            logger.info("Question bank seeded successfully")
+            logger.info("Question bank seeded successfully into DB and JSON")
     except Exception as e:
         logger.warning(f"Could not seed question bank: {e}")
 
-    # Pre-train ML model if not already trained
+    # Maintenance cleanup: expired OTPs and retained audio recordings
     try:
-        from src.ml_scoring.model import train_model
-        model_path = os.getenv("SCORING_MODEL_PATH", "./models/scoring_model.joblib")
-        if not os.path.exists(model_path):
-            metrics = train_model()
-            logger.info(f"ML model trained: {metrics}")
+        from src.auth.otp_manager import cleanup_expired_otps
+        from src.interviewer.audio_service import cleanup_expired_audio
+        cleanup_expired_otps()
+        cleanup_expired_audio()
     except Exception as e:
-        logger.warning(f"Could not pre-train ML model: {e}")
+        logger.warning(f"Startup cleanup warning: {e}")
 
     logger.info("✅ API startup complete")
 
@@ -89,15 +89,27 @@ app.add_middleware(
 )
 
 # Mount route modules
-from src.api.routes import auth, admin, upload, ask, interview, score, mcq_interview
+from src.api.routes import (
+    admin,
+    ask,
+    audio_interview,
+    auth,
+    mcq_interview,
+    questions,
+    score,
+    scraping,
+    upload,
+)
 
 app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(admin.router, prefix="/api/v1", tags=["Admin Portal"])
 app.include_router(upload.router, prefix="/api/v1", tags=["Document Upload"])
 app.include_router(ask.router, prefix="/api/v1", tags=["RAG Q&A"])
-app.include_router(interview.router, prefix="/api/v1", tags=["Mock Interview (Open-Ended)"])
 app.include_router(mcq_interview.router, prefix="/api/v1", tags=["Mock Interview (MCQ)"])
-app.include_router(score.router, prefix="/api/v1", tags=["Scoring & Recommendations"])
+app.include_router(audio_interview.router, prefix="/api/v1", tags=["AI Audio Interview"])
+app.include_router(questions.router, prefix="/api/v1", tags=["Centralized Question Bank"])
+app.include_router(scraping.router, prefix="/api/v1", tags=["Dynamic Question Bank & Scraping"])
+app.include_router(score.router, prefix="/api/v1", tags=["ATS Scoring & Analytics"])
 
 
 @app.get("/", tags=["Health"])
@@ -124,17 +136,19 @@ async def health_check():
     except Exception as e:
         components["vector_store"] = f"unhealthy: {str(e)}"
 
-    # Check ML model
-    model_path = os.getenv("SCORING_MODEL_PATH", "./models/scoring_model.joblib")
-    components["ml_model"] = "healthy" if os.path.exists(model_path) else "not_trained"
-
     # Check question bank
     qb_path = os.getenv("QUESTION_BANK_PATH", "./data/question_bank/questions.json")
     components["question_bank"] = "healthy" if os.path.exists(qb_path) else "not_seeded"
 
-    # Check HF token
+    # Check LLM API configuration
+    groq_key = os.getenv("GROQ_API_KEY", "")
     hf_token = os.getenv("HF_API_TOKEN", "")
-    components["llm_api"] = "configured" if hf_token and hf_token != "hf_your_free_token_here" else "not_configured"
+    components["llm_api"] = (
+        "configured"
+        if (groq_key and groq_key != "your_groq_api_key_here")
+        or (hf_token and hf_token != "hf_your_free_token_here")
+        else "not_configured"
+    )
 
     # Check database
     try:

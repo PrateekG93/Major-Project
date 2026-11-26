@@ -89,6 +89,10 @@ def _split_by_size(
     if len(words) <= chunk_size:
         return [text]
 
+    # Ensure step is positive to prevent infinite loops when overlap >= chunk_size
+    effective_overlap = min(overlap, max(0, chunk_size - 1))
+    step = max(1, chunk_size - effective_overlap)
+
     chunks = []
     start = 0
     while start < len(words):
@@ -96,9 +100,8 @@ def _split_by_size(
         chunk_text = " ".join(words[start:end])
         chunks.append(chunk_text)
 
-        # Move forward by (chunk_size - overlap) words
-        start += chunk_size - overlap
-        if start >= len(words):
+        start += step
+        if end >= len(words):
             break
 
     return chunks

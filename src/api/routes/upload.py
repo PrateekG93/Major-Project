@@ -136,12 +136,24 @@ async def upload_jd(
     if not final_text.strip():
         raise HTTPException(status_code=422, detail="JD appears to be empty.")
 
-    save_user_document(email, "jd", final_text, filename)
+    from src.interviewer.role_matcher import parse_jd_metadata
+    parsed_role, parsed_company = parse_jd_metadata(final_text, filename)
+
+    save_user_document(
+        email,
+        "jd",
+        final_text,
+        filename,
+        parsed_role=parsed_role,
+        parsed_company=parsed_company,
+    )
 
     return {
         "status": "success",
         "filename": filename,
         "text_length": len(final_text),
+        "parsed_role": parsed_role,
+        "parsed_company": parsed_company,
         "preview": final_text[:500] + "..." if len(final_text) > 500 else final_text,
     }
 
@@ -152,8 +164,14 @@ async def get_documents(x_session_token: Optional[str] = Header(None)):
     email = _get_user_email(x_session_token)
     docs = get_user_documents(email)
 
+    jd_doc = docs["jd"]
+    parsed_role = jd_doc.get("parsed_role", "") if jd_doc else ""
+    parsed_company = jd_doc.get("parsed_company", "") if jd_doc else ""
+
     return {
         "email": email,
+        "dossier_role": parsed_role,
+        "dossier_company": parsed_company,
         "resume": {
             "uploaded": docs["resume"] is not None,
             "filename": docs["resume"]["filename"] if docs["resume"] else None,
@@ -161,9 +179,11 @@ async def get_documents(x_session_token: Optional[str] = Header(None)):
             "preview": docs["resume"]["content_text"][:500] if docs["resume"] else None,
         },
         "jd": {
-            "uploaded": docs["jd"] is not None,
-            "filename": docs["jd"]["filename"] if docs["jd"] else None,
-            "text_length": len(docs["jd"]["content_text"]) if docs["jd"] else 0,
-            "preview": docs["jd"]["content_text"][:500] if docs["jd"] else None,
+            "uploaded": jd_doc is not None,
+            "filename": jd_doc["filename"] if jd_doc else None,
+            "text_length": len(jd_doc["content_text"]) if jd_doc else 0,
+            "parsed_role": parsed_role,
+            "parsed_company": parsed_company,
+            "preview": jd_doc["content_text"][:500] if jd_doc else None,
         },
     }
