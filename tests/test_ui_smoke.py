@@ -255,6 +255,7 @@ def test_admin_panel_renders_cleanly(ui_env):
     at_admin.session_state.admin_token = "admin_verified"
     at_admin.run()
     assert not at_admin.exception
+    assert not at_admin.error, f"Admin page rendered unexpected error banners: {[e.value for e in at_admin.error]}"
 
     tab_labels = [t.label for t in at_admin.tabs]
     assert "📊 Assessment Results" in tab_labels

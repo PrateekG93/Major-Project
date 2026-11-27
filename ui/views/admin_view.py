@@ -93,10 +93,10 @@ def render():
 
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("📚 Materials", len(mats))
-        c2.metric("🧩 ChromaDB Chunks", total_chunks)
-        c3.metric("👥 Users (Verified)", f"{len(usrs)} ({verified_cnt})")
-        c4.metric("🎙️ Audio Interviews", len(auds))
-        c5.metric("📊 MCQ Batteries", len(mcqs))
+        c2.metric("🧩 Chunks", total_chunks, help="Total indexed chunks in ChromaDB")
+        c3.metric("👥 Users", f"{len(usrs)} ({verified_cnt}✓)", help="Registered users (email-verified count)")
+        c4.metric("🎙️ Audio", len(auds), help="Adaptive AI Audio Interview sessions")
+        c5.metric("📊 MCQs", len(mcqs), help="Timed MCQ Examination Battery sessions")
         st.markdown("---")
     except Exception:
         pass
@@ -333,8 +333,11 @@ def render():
                                 st.markdown(f"- **Questions / Follow-ups:** `{ar.get('questions_asked', 0)}` main, `{ar.get('followups_asked', 0)}` follow-ups")
                                 st.markdown(f"- **Score & Grade:** `{score_lbl}`")
                                 st.markdown(f"- **Status:** {st_icon}")
+                elif aud_resp.status_code == 404:
+                    st.error("Audio results endpoint returned 404 — please restart the FastAPI backend (`uvicorn`) to load the updated admin routes.")
                 else:
-                    st.error("Failed to fetch audio interview results.")
+                    detail = aud_resp.json().get("detail", aud_resp.status_code) if aud_resp.headers.get("content-type", "").startswith("application/json") else aud_resp.status_code
+                    st.error(f"Failed to fetch audio interview results ({detail}).")
             except Exception as e:
                 st.error(f"Error: {str(e)}")
 

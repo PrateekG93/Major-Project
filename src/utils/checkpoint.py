@@ -822,14 +822,30 @@ def get_all_audio_results() -> list[dict]:
         rows = conn.execute(
             """
             SELECT session_id, email, company, job_role, interview_round, difficulty,
-                   status, questions_asked, followups_asked, total_score, grade,
-                   started_at, completed_at
+                   status, current_question_index, max_questions, overall_score,
+                   state_json, report_json, started_at, ended_at
             FROM audio_interview_sessions
             ORDER BY started_at DESC
             """
         ).fetchall()
-        return [
-            {
+        results = []
+        for r in rows:
+            state = {}
+            report = {}
+            try:
+                state = json.loads(r[10]) if r[10] else {}
+            except Exception:
+                pass
+            try:
+                report = json.loads(r[11]) if r[11] else {}
+            except Exception:
+                pass
+            turns = state.get("turns", []) if isinstance(state, dict) else []
+            main_turns = sum(1 for t in turns if not t.get("is_followup"))
+            followup_turns = sum(1 for t in turns if t.get("is_followup"))
+            score_val = report.get("overall_score", r[9]) if isinstance(report, dict) else r[9]
+            grade_val = (report.get("grade") if isinstance(report, dict) else None) or "N/A"
+            results.append({
                 "session_id": r[0],
                 "email": r[1],
                 "company": r[2] or "",
@@ -837,15 +853,15 @@ def get_all_audio_results() -> list[dict]:
                 "interview_round": r[4] or "Technical",
                 "difficulty": r[5] or "medium",
                 "status": r[6] or "active",
-                "questions_asked": r[7] or 0,
-                "followups_asked": r[8] or 0,
-                "total_score": r[9] or 0.0,
-                "grade": r[10] or "N/A",
-                "started_at": r[11],
-                "completed_at": r[12],
-            }
-            for r in rows
-        ]
+                "questions_asked": main_turns or (r[7] or 0),
+                "max_questions": r[8] or 5,
+                "followups_asked": followup_turns,
+                "total_score": float(score_val or 0.0),
+                "grade": grade_val,
+                "started_at": r[12],
+                "completed_at": r[13],
+            })
+        return results
     finally:
         conn.close()
 
